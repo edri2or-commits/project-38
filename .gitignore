@@ -1,0 +1,85 @@
+# Project 38 V2 — Git Ignore Rules
+
+# Evidence Store (External to Repo)
+# Never commit evidence artifacts — use manifest instead
+C:\Users\edri2\project_38__evidence_store/
+project_38__evidence_store/
+
+# Local Evidence Dumps (if created under repo)
+docs/evidence/raw/
+docs/evidence/dumps/
+**/evidence_raw/
+**/evidence_dumps/
+
+# Secrets and Credentials (Double-check protection)
+*.key
+*.pem
+*.p12
+*.pfx
+*_secret.txt
+*_credentials.json
+.env
+.env.local
+.env.*.local
+
+# GCP Service Account Keys
+*-service-account-key.json
+*-sa-key.json
+
+# Local Development
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Temporary Files
+*.tmp
+*.temp
+*.log
+*.bak
+*.orig
+
+# Python (if used for tooling)
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+build/
+dist/
+*.egg-info/
+
+# Node.js (if used for tooling)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+yarn.lock
+
+# Docker (local builds)
+docker-compose.override.yml
+.dockerignore
+
+# OS Files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Desktop.ini
+
+# Keep These (Exceptions)
+# Manifest should be committed
+!docs/evidence/manifest.md
+!docs/evidence/manifest.json
+
+# Keep documented example secrets (if any)
+!docs/examples/*_secret_example.txt
