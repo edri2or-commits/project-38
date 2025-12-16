@@ -1,14 +1,14 @@
 # Phase Status — Project 38 (V2)
 
-**Last Updated:** 2024-12-15
+**Last Updated:** 2025-12-15
 
 ---
 
-## Current Phase: PRE-BUILD
+## Current Phase: Phase 2 — Infrastructure & Deployment
 
-**Status:** Planning + Bootstrap (no workload deployments yet)
+**Status:** Slice 1 ✅ COMPLETE, Slice 2A 📋 PLANNED (awaiting execution approval)
 
-**Mode:** Documentation and context ingestion only
+**Mode:** Incremental deployment with approval gates
 
 ---
 
@@ -54,51 +54,66 @@
 - ✅ LEGACY quarantine: C:\Users\edri2\Desktop\AI\ai-os (READ-ONLY)
 
 ### 6. Context Documentation
-- ✅ gcp_state_snapshot.md created
-- ✅ repos_and_paths.md created
-- ✅ phase_status.md created (this file)
+- ✅ Strategic Narrative created (PROJECT_NARRATIVE.md)
+- ✅ Source of Truth files established (docs/context/)
+- ✅ Traceability Matrix created
+- ✅ Evidence protocol documented
+
+### 7. Infrastructure (Slice 1 — VM Baseline)
+- **Status:** ✅ COMPLETE (2025-12-15, execution duration: 4min 30sec)
+- **VM:** p38-dev-vm-01 (e2-medium, us-central1-a)
+- **Static IP:** p38-dev-ip-01 (136.111.39.139)
+- **Firewall:** SSH (22), HTTP (80), HTTPS (443)
+- **Docker:** v29.1.3 + Docker Compose v5.0.0 installed
+- **Service Account:** n8n-runtime attached and secret access verified
+- **Evidence:** [Execution Log](../phase-2/slice-01_execution_log.md)
 
 ---
 
-## 🔄 NEXT (When Instructed)
+## 📋 NEXT (Awaiting Explicit Approval)
 
-### Slice 1: DEV Environment Setup
-**Target:** `project-38-ai` only
+### Slice 2A: N8N + Postgres Deployment
+**Target:** `project-38-ai` (DEV) only
 
-**Tasks:**
-1. **Validate secret access**
-   - Use metadata checks only (do NOT create secrets)
-   - Verify service accounts can read assigned secrets
-   - Test: `gcloud secrets versions access latest --secret=<name> --impersonate-service-account=<SA>`
+**Scope:**
+- Deploy n8n workflow engine (n8nio/n8n:latest)
+- Deploy PostgreSQL database (postgres:16-alpine)
+- Access via SSH port-forward (localhost:5678 → VM:5678)
+- Use n8n-runtime SA (3 secrets only: n8n-encryption-key, postgres-password, telegram-bot-token)
 
-2. **Network setup**
-   - Create VPC if needed
-   - Configure Cloud NAT (for private VMs to access internet)
-   - Set up firewall rules
+**Documentation:**
+- ✅ [Runbook](../phase-2/slice-02a_runbook.md) — 7-step execution plan
+- ✅ [Evidence Pack](../phase-2/slice-02a_evidence_pack.md) — Capture requirements
+- ✅ [Rollback Plan](../phase-2/slice-02a_rollback_plan.md) — Cleanup procedures
 
-3. **Compute infrastructure**
-   - Deploy VM(s) for kernel/n8n (if using GCE)
-   - OR configure Cloud Run services
-   - Assign service accounts to workloads
+**Approval Required:** User must say **"Execute Slice 2A"**
 
-4. **Storage setup**
-   - Cloud SQL (PostgreSQL) for n8n state
-   - OR managed database alternative
+---
 
-5. **Deploy workloads**
-   - N8N engine
-   - Kernel/Agent service
-   - Configure inter-service communication
+## ⏸️ DEFERRED
 
-6. **Testing & validation**
-   - Smoke tests
-   - Secret injection verification
-   - Logging verification
+### Slice 2B/3: Kernel Service Deployment
+**Blocker:** Service account architecture decision
 
-**Important:**
-- Start with DEV only
-- No PROD deployments until DEV is validated
-- All changes tracked in Git
+**Options:**
+1. Separate VM with kernel-runtime SA (recommended)
+2. Multi-SA on same VM (if GCP supports)
+3. Credential file approach (less preferred)
+
+**Dependencies:** Slice 2A completion + architecture decision
+
+---
+
+### Advanced Infrastructure (Phase 3)
+**Components:**
+- Cloud SQL (managed PostgreSQL)
+- Custom VPC with Cloud NAT
+- litellm migration to Cloud Run
+- Load balancing for horizontal scaling
+
+**Trigger:** Only if VM baseline hits scaling limits or ops burden
+
+**Dependencies:** 3+ months stable VM operations + cost-benefit analysis
 
 ---
 
@@ -110,9 +125,9 @@
 3. ❌ Deploy to PROD before DEV validation
 4. ❌ Create resources in any GCP project other than `project-38-ai` or `project-38-ai-prod`
 5. ❌ Write to legacy workspace (`ai-os`) without `LEGACY_WRITE_OK` keyword
-6. ❌ Auto-sync to Drive (create update requests instead)
+6. ❌ Auto-sync to Drive (Drive is deprecated, repo is SSOT)
 7. ❌ Run gcloud commands without `--project` flag
-8. ❌ Assume facts not in the Facts Block
+8. ❌ Assume facts not in documentation
 
 ### Verification Only
 - If you need to verify secrets/IAM: list names/metadata ONLY
@@ -125,20 +140,28 @@
 ## Phase Progression
 
 ```
-Current → PRE-BUILD (✅ we are here)
-Next    → Slice 1: DEV Infrastructure (when user instructs)
-Then    → Slice 2: DEV Workload Deploy
-Then    → Slice 3: DEV Testing & Validation
-Then    → Slice 4: PROD Mirror (after DEV approval)
+Phase 1 → Analysis & Planning ✅ COMPLETE
+Phase 2 → Infrastructure & Deployment 🔄 IN PROGRESS
+  ├─ Slice 1: VM Baseline ✅ COMPLETE (2025-12-15)
+  ├─ Slice 2A: N8N Deployment 📋 PLANNED (awaiting approval)
+  ├─ Slice 2B/3: Kernel Deployment ⏸️ DEFERRED (architecture TBD)
+  └─ Slice 3: Testing & Validation 📋 NEXT (after Slice 2A)
+Phase 3 → Advanced Infrastructure ⏸️ OPTIONAL (only if needed)
+Phase 4 → PROD Mirror ⏸️ DEFERRED (after DEV validation)
 ```
 
 ---
 
 ## Decision Points
 
-Before proceeding to next phase, user must:
-- ✅ Review and approve context documentation
-- ✅ Explicitly instruct to start Slice 1
-- ✅ Confirm no additional secrets/IAM changes needed
+Before proceeding to Slice 2A:
+- ✅ Slice 1 complete and verified
+- ✅ Documentation reviewed (runbook, evidence pack, rollback plan)
+- ❓ User approval required: **"Execute Slice 2A"**
 
-**Current status:** Waiting for user instruction to proceed.
+Before proceeding to Slice 2B/3:
+- ❌ Slice 2A must be complete
+- ❌ Service account architecture decision required
+- ❌ User approval required
+
+**Current status:** Ready for Slice 2A execution (awaiting approval)

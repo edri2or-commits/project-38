@@ -84,7 +84,6 @@ project-38/
 
 **Slice 2A: N8N + Postgres Deployment**
 - Status: 📋 PLANNED (documentation ready)
-- Duration: 20-30 minutes (estimated)
 - Approval: User must say **"Execute Slice 2A"**
 - Documentation: [Runbook](docs/phase-2/slice-02a_runbook.md) | [Evidence Pack](docs/phase-2/slice-02a_evidence_pack.md) | [Rollback Plan](docs/phase-2/slice-02a_rollback_plan.md)
 
