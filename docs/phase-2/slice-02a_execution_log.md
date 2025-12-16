@@ -14,9 +14,10 @@
 Successfully deployed N8N workflow engine with PostgreSQL database to DEV VM using Docker Compose. All services running, health checks passing, UI accessible via SSH port-forward.
 
 **Key Achievements:**
-- ✅ 2 containers deployed: postgres:16-alpine, n8nio/n8n:latest
+- ✅ 2 containers deployed: postgres@sha256:a507..., n8nio/n8n@sha256:e3a4...
 - ✅ 3 secrets fetched from Secret Manager at runtime (zero hardcoded values)
 - ✅ Least privilege: n8n-runtime SA with access to only 3 required secrets
+- ✅ Security hardening: Node access blocked, dangerous nodes excluded
 - ✅ Secure networking: Port 5678 bound to localhost, SSH tunnel for UI access
 - ✅ Health checks: Postgres accepting connections, N8N API responding
 - ✅ Zero firewall changes (SSH port-forward approach)
@@ -629,6 +630,31 @@ rm /home/edri2/docker-compose.yml /home/edri2/load-secrets.sh
 - [x] Logs reviewed (no errors)
 
 **Next Milestone:** Slice 2B/3 - Kernel Deployment (pending SA architecture decision)
+
+---
+
+## Post-Execution Update (2025-12-16)
+
+**SSOT Reconciliation:**
+The docker-compose.yml shown in Step 1 represents the initial template. The **actual deployed configuration** included additional security hardening that was added during POC-02:
+
+**Changes Applied:**
+1. **Image Pinning:** `:latest` tags replaced with SHA256 digests for reproducibility
+   - postgres:16-alpine → postgres@sha256:a5074487380d4e686036ce61ed6f2d363939ae9a0c40123d1a9e3bb3a5f344b4
+   - n8nio/n8n:latest → n8nio/n8n@sha256:e3a4256dd2aa3b987e10da3c1194081575933987b26a604a4f52d2bdd62a5b72
+
+2. **Security Hardening (added to n8n container):**
+   - `N8N_BLOCK_ENV_ACCESS_IN_NODE: 'true'` - Prevents workflow nodes from accessing system env vars
+   - `NODES_EXCLUDE: 'n8n-nodes-base.executeCommand,n8n-nodes-base.readWriteFile'` - Blocks dangerous nodes
+   - `N8N_SECURE_COOKIE: 'true'` - Forces secure cookies
+   - `N8N_USER_MANAGEMENT_DISABLED: true` - Single-user mode
+   - `N8N_API_DISABLED: false` + `N8N_PUBLIC_API_ENABLED: true` - API control
+
+3. **Healthcheck Removed:** The `healthcheck` block in postgres service was not used in final deployment
+
+**Source of Truth:** The canonical configuration is now in `deployment/n8n/docker-compose.yml` (updated 2025-12-16 to reflect actual deployment).
+
+**Evidence:** See drift analysis in [POC-02 verification session]
 
 ---
 

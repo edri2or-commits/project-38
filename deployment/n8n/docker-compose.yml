@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   postgres:
-    image: postgres:16-alpine
+    image: postgres@sha256:a5074487380d4e686036ce61ed6f2d363939ae9a0c40123d1a9e3bb3a5f344b4
     container_name: p38-postgres
     environment:
       POSTGRES_DB: n8n
@@ -15,7 +15,7 @@ services:
     restart: unless-stopped
 
   n8n:
-    image: n8nio/n8n:latest
+    image: n8nio/n8n@sha256:e3a4256dd2aa3b987e10da3c1194081575933987b26a604a4f52d2bdd62a5b72
     container_name: p38-n8n
     ports:
       - "127.0.0.1:5678:5678"
@@ -29,6 +29,12 @@ services:
       N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY}
       WEBHOOK_URL: http://136.111.39.139/
       N8N_TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      N8N_BLOCK_ENV_ACCESS_IN_NODE: 'true'
+      NODES_EXCLUDE: 'n8n-nodes-base.executeCommand,n8n-nodes-base.readWriteFile'
+      N8N_SECURE_COOKIE: 'true'
+      N8N_USER_MANAGEMENT_DISABLED: true
+      N8N_API_DISABLED: false
+      N8N_PUBLIC_API_ENABLED: true
     depends_on:
       - postgres
     volumes:

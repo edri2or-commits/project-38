@@ -19,11 +19,17 @@ Defines 2 services:
 - Port 5678 bound to localhost only (127.0.0.1)
 - Secrets passed as environment variables
 - Persistent volumes for data
-- Health checks configured
+- Security hardening (node access blocked, dangerous nodes excluded)
 - Bridge network for inter-service communication
+- Image digests pinned for reproducibility
 
 ### load-secrets.sh
 Runtime secret fetcher from GCP Secret Manager.
+
+**⚠️ WEBHOOK_URL Note:**
+Currently set to `http://136.111.39.139/` but port 5678 is localhost-only without reverse proxy.
+Webhooks work via Cloudflare Tunnel in POC-02 (see docs/phase-2/poc-02_telegram_webhook.md).
+For production, deploy proper ingress (nginx/Caddy) or update to tunnel URL.
 
 **Secrets Fetched:**
 1. n8n-encryption-key
