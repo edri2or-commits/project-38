@@ -27,9 +27,10 @@ DEV: project-38-ai
 PROD: project-38-ai-prod
 
 READ THESE FIRST (in order):
-1. docs/context/operating_rules.md
-2. docs/context/project_facts.md
-3. docs/traceability_matrix.md
+1. PROJECT_NARRATIVE.md (ENTRY POINT - read this first for "why" and "how")
+2. docs/context/operating_rules.md
+3. docs/context/project_facts.md
+4. docs/traceability_matrix.md
 
 VERIFY KEY HASHES:
 - slice-02a_runbook.md: 3C26E6A0BE30D7A8E43B97087896A50EDB07F41BBFB43B5837347B084676931E
@@ -54,19 +55,27 @@ READY.
 
 ## What Claude Does After Receiving This
 
-### Step 1: Read Core Files
-Claude reads these 3 files in order:
+### Step 1: Read Entry Point
+Claude reads `PROJECT_NARRATIVE.md` first:
+- **Why We're Here:** V1 pain points and rebuild rationale
+- **What We're Building:** V2 vision and goals
+- **How We're Building It:** Architecture decisions and patterns
+- **Where We Are Now:** Current infrastructure state
+- **Operating Model:** Core principles and workflows
+
+### Step 2: Read Core Files
+Then Claude reads these 3 files in order:
 1. `docs/context/operating_rules.md` — Operating protocols
 2. `docs/context/project_facts.md` — Immutable facts
 3. `docs/traceability_matrix.md` — Current status + evidence
 
-### Step 2: Verify Hashes (Optional)
+### Step 3: Verify Hashes (Optional)
 If critical files have hash mismatches, Claude flags it:
 - **Expected hash:** From session start packet
 - **Actual hash:** From file content
 - **If mismatch:** Warn user, don't proceed
 
-### Step 3: Print Snapshot
+### Step 4: Print Snapshot
 Claude prints a 5-8 line status snapshot:
 ```
 📸 Snapshot:
@@ -76,7 +85,7 @@ Claude prints a 5-8 line status snapshot:
 🎯 Ready to: [respond to user request]
 ```
 
-### Step 4: Await Instruction
+### Step 5: Await Instruction
 Claude does NOT execute any action until user provides explicit instruction:
 - ✅ **Approved:** "Execute Slice 2A", "Run Slice 2B", "Deploy to PROD"
 - ❌ **Not approved:** "What's the status?", "Can you help with X?", "Show me Y"
@@ -155,6 +164,9 @@ sha256sum C:\Users\edri2\project_38\docs\phase-2\slice-02a_runbook.md
 ## Required Files (Must Exist in Repo)
 
 Claude needs these files to operate correctly:
+
+### Entry Point (Root)
+- ✅ `PROJECT_NARRATIVE.md` — Strategic overview (START HERE)
 
 ### Core Context Files (docs/context/)
 - ✅ `operating_rules.md` — Anti-chaos protocols

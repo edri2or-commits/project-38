@@ -24,6 +24,7 @@
 | **Secrets (GCP Secret Manager)** | ✅ DONE | PRE-BUILD | SYNC_OK / FINAL_OK | 7 secrets × 2 projects, 2 ENABLED versions each |
 | **IAM (Service Accounts)** | ✅ DONE | PRE-BUILD | IAM_OK | 3 SA per project + least privilege matrix |
 | **Context Documentation** | ✅ DONE | PRE-BUILD | Files in docs/context/ | 4 canonical files created |
+| **Strategic Narrative (PROJECT_NARRATIVE.md)** | ✅ DONE | Phase 1 | Root file | Entry point document with "why" and "how" (2025-12-16) |
 | **Infrastructure (Slice 1 - VM Baseline)** | ✅ DONE | Slice 1 | [Execution Log](phase-2/slice-01_execution_log.md) | Completed 2025-12-15 • VM + Docker + IAM verified |
 | **Advanced Infrastructure (Cloud SQL, NAT, VPC)** | ⏸️ OPTIONAL/DEFERRED | Phase 2B/3 | N/A | Only if scaling/managed DB required |
 | **Workload Deployment (Slice 2A - N8N)** | 📋 NEXT | Slice 2A | [Runbook](phase-2/slice-02a_runbook.md) | N8N + Postgres only (least privilege) |
