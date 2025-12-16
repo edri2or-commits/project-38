@@ -1,6 +1,6 @@
 # Traceability Matrix — Project 38 (V2)
 
-**Last Updated:** 2025-12-15 (Slice 1 Complete)  
+**Last Updated:** 2025-12-16 (Slice 2A Complete)  
 **Purpose:** Track completion status and evidence for all project components
 
 ---
@@ -28,7 +28,7 @@
 | **Deployment Scripts** | ✅ DONE | Phase 2 | Root scripts | 4 automation scripts: fetch_secrets.sh, startup.sh, p38_sync_secrets.ps1, gpt_google_workspace_schema.yaml (2025-12-16, commit c70a8a1) |
 | **Infrastructure (Slice 1 - VM Baseline)** | ✅ DONE | Slice 1 | [Execution Log](phase-2/slice-01_execution_log.md) | Completed 2025-12-15 • VM + Docker + IAM verified |
 | **Advanced Infrastructure (Cloud SQL, NAT, VPC)** | ⏸️ OPTIONAL/DEFERRED | Phase 2B/3 | N/A | Only if scaling/managed DB required |
-| **Workload Deployment (Slice 2A - N8N)** | 📋 NEXT | Slice 2A | [Runbook](phase-2/slice-02a_runbook.md) | N8N + Postgres only (least privilege) |
+| **Workload Deployment (Slice 2A - N8N)** | ✅ DONE | Slice 2A | [Execution Log](phase-2/slice-02a_execution_log.md) | Completed 2025-12-16 • N8N + Postgres deployed (72 min) |
 | **Workload Deployment (Slice 2B/3 - Kernel)** | ⏸️ DEFERRED | Slice 2B/3 | Pending | Kernel service - SA architecture TBD |
 | **Testing & Validation (Slice 3)** | 📋 NEXT | Slice 3 | Pending | DEV environment validation |
 | **PROD Mirror (Slice 4)** | ⏸️ DEFERRED | Slice 4 | Pending | After DEV approval |
@@ -146,7 +146,14 @@
 
 ## Detailed Status: Workload Deployment (Slice 2A - N8N Only)
 
-### Status: 📋 NEXT (Documentation Complete, Awaiting Execution)
+### Status: ✅ DONE (Executed 2025-12-16)
+
+**Execution Status:** ✅ COMPLETE  
+**Documentation:**
+- [Runbook](phase-2/slice-02a_runbook.md) — Step-by-step execution plan
+- [Execution Log](phase-2/slice-02a_execution_log.md) — Full execution evidence (~72 minutes)
+- [Evidence Pack](phase-2/slice-02a_evidence_pack.md) — Evidence capture requirements
+- [Rollback Plan](phase-2/slice-02a_rollback_plan.md) — Cleanup procedures
 
 **Split Decision:** Slice 2 split into 2A (N8N) + 2B/3 (Kernel) for least privilege compliance
 
@@ -158,10 +165,32 @@
 - **Secrets:** 3 only (n8n-encryption-key, postgres-password, telegram-bot-token)
 - **Service Account:** n8n-runtime (has access to 3 secrets only)
 
-**Documentation:**
-- ✅ [Runbook](phase-2/slice-02a_runbook.md) — 557 lines, 7-step execution plan
-- ✅ [Evidence Pack](phase-2/slice-02a_evidence_pack.md) — 427 lines, template ready
-- ✅ [Rollback Plan](phase-2/slice-02a_rollback_plan.md) — 508 lines, 5-step rollback
+**Completed Components:**
+- ✅ N8N workflow engine deployed (n8nio/n8n:latest)
+- ✅ PostgreSQL database deployed (postgres:16-alpine)
+- ✅ Docker Compose orchestration (2 services)
+- ✅ 3 secrets fetched at runtime from Secret Manager
+- ✅ SSH port-forward established (localhost:5678 → VM:5678)
+- ✅ Health checks passing (Postgres + N8N API)
+- ✅ Security: Port 5678 bound to localhost only, zero firewall changes
+
+**Execution Details:**
+- **Duration:** ~72 minutes (including image pulls and verification)
+- **Date:** 2025-12-16
+- **Strategy:** Runtime secret injection, SSH tunnel for UI access
+- **All commands:** Used `--project project-38-ai` flag
+- **Environment:** DEV only (project-38-ai)
+
+**Resources Created:**
+- Containers: p38-postgres, p38-n8n
+- Network: edri2_project38-network (bridge)
+- Volumes: edri2_postgres_data, edri2_n8n_data
+- UI Access: http://localhost:5678 (via SSH tunnel)
+
+**Evidence:**
+- Full execution log: [slice-02a_execution_log.md](phase-2/slice-02a_execution_log.md)
+- RAW outputs included (with secret redaction)
+- Verification checks: All passed ✅
 
 **Rationale for Split:**
 1. **Least Privilege:** n8n-runtime SA has IAM access to only 3 secrets (n8n-encryption-key, postgres-password, telegram-bot-token)
@@ -169,12 +198,9 @@
 3. **Cannot deploy Kernel with n8n-runtime SA** (would violate least privilege or require SA changes)
 4. **Networking:** SSH port-forward approach (no firewall changes, secure encrypted tunnel)
 
-**Duration Estimate:** 20-30 minutes
-
-**Dependencies:**
-- ✅ Slice 1 complete (VM + Docker + IAM verified)
-
-**Action Required:** Awaiting user instruction to execute
+**Next Steps:**
+- Ready for Slice 2B/3: Kernel deployment (SA architecture decision required)
+- OR proceed to Slice 3: Testing & validation (N8N only)
 
 ---
 
