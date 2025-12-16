@@ -1,0 +1,37 @@
+{
+  "name": "Telegram POC v2",
+  "active": false,
+  "versionId": "v2-tg-simple",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "telegram-v2",
+        "httpMethod": "POST",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "tg-wh-v2",
+      "name": "Telegram Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [250, 300],
+      "webhookId": "telegram-v2"
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\nconst update_id = input.update_id;\n\nif (!update_id) {\n  console.log('[TG-POC] No update_id');\n  return [{ json: { status: 'no_update_id' } }];\n}\n\nconst staticData = $getWorkflowStaticData('global');\nif (!staticData.ids) staticData.ids = [];\n\nif (staticData.ids.includes(update_id)) {\n  console.log('[TG-POC] DUPLICATE:', update_id);\n  return [{ json: { status: 'duplicate', update_id } }];\n}\n\nstaticData.ids.push(update_id);\nif (staticData.ids.length > 100) staticData.ids.shift();\n\nconst msg = input.message || {};\nconsole.log('[TG-POC] NEW:', update_id, 'from:', msg.from?.first_name, 'text:', msg.text);\n\nreturn [{ json: { status: 'processed', update_id, chat_id: msg.chat?.id, text: msg.text } }];"
+      },
+      "id": "dedup-v2",
+      "name": "Dedup Log",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [450, 300]
+    }
+  ],
+  "connections": {
+    "Telegram Webhook": {
+      "main": [[{"node": "Dedup Log", "type": "main", "index": 0}]]
+    }
+  },
+  "settings": {"executionOrder": "v1"}
+}

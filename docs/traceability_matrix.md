@@ -1,6 +1,6 @@
 # Traceability Matrix — Project 38 (V2)
 
-**Last Updated:** 2025-12-16 (Slice 2A Complete)  
+**Last Updated:** 2025-12-16 (POC-02 Complete)  
 **Purpose:** Track completion status and evidence for all project components
 
 ---
@@ -29,6 +29,8 @@
 | **Infrastructure (Slice 1 - VM Baseline)** | ✅ DONE | Slice 1 | [Execution Log](phase-2/slice-01_execution_log.md) | Completed 2025-12-15 • VM + Docker + IAM verified |
 | **Advanced Infrastructure (Cloud SQL, NAT, VPC)** | ⏸️ OPTIONAL/DEFERRED | Phase 2B/3 | N/A | Only if scaling/managed DB required |
 | **Workload Deployment (Slice 2A - N8N)** | ✅ DONE | Slice 2A | [Execution Log](phase-2/slice-02a_execution_log.md) | Completed 2025-12-16 • N8N + Postgres deployed (72 min) |
+| **POC-01: Headless Activation + Hardening** | ✅ PASS | Phase 2 | [POC-01 Doc](phase-2/poc-01_headless_hardening.md) | Completed 2025-12-16 • Headless workflow activation verified |
+| **POC-02: Telegram Webhook Integration** | ✅ PASS | Phase 2 | [POC-02 Doc](phase-2/poc-02_telegram_webhook.md) | Completed 2025-12-16 • Telegram webhook + dedup verified |
 | **Workload Deployment (Slice 2B/3 - Kernel)** | ⏸️ DEFERRED | Slice 2B/3 | Pending | Kernel service - SA architecture TBD |
 | **Testing & Validation (Slice 3)** | 📋 NEXT | Slice 3 | Pending | DEV environment validation |
 | **PROD Mirror (Slice 4)** | ⏸️ DEFERRED | Slice 4 | Pending | After DEV approval |
@@ -201,6 +203,48 @@
 **Next Steps:**
 - Ready for Slice 2B/3: Kernel deployment (SA architecture decision required)
 - OR proceed to Slice 3: Testing & validation (N8N only)
+
+---
+
+## Detailed Status: POC-01 (Headless Activation + Hardening)
+
+### Status: ✅ PASS (Executed 2025-12-16)
+
+**Documentation:** [poc-01_headless_hardening.md](phase-2/poc-01_headless_hardening.md)
+
+**Verified:**
+- ✅ Workflow import via CLI (`n8n import:workflow`)
+- ✅ Headless activation (workaround for CLI bug)
+- ✅ Webhook responds HTTP 200 without UI
+- ✅ Security hardening active (`N8N_BLOCK_ENV_ACCESS_IN_NODE=true`, `NODES_EXCLUDE`)
+
+**Key Discovery:**
+- `active=true` is NOT enough — requires `activeVersionId` + `workflow_history` record
+- CLI bug: `n8n publish:workflow` fails on imported workflows
+- Workaround script: `deployment/n8n/scripts/n8n-activate.sh`
+
+---
+
+## Detailed Status: POC-02 (Telegram Webhook Integration)
+
+### Status: ✅ PASS (Executed 2025-12-16)
+
+**Documentation:** [poc-02_telegram_webhook.md](phase-2/poc-02_telegram_webhook.md)
+
+**Verified:**
+- ✅ Cloudflare Tunnel for HTTPS (`https://count-allowing-licensing-demands.trycloudflare.com`)
+- ✅ Telegram setWebhook + getWebhookInfo
+- ✅ n8n receives updates (execution evidence: ID #19, status=success)
+- ✅ Basic update_id deduplication (in-memory)
+
+**Infrastructure:**
+- Workflow ID: `fyYPOaF7uoCMsa2U`
+- Webhook Path: `/webhook/telegram-v2`
+
+**Limitations (Production):**
+- Cloudflare Tunnel = temporary (URL changes on restart)
+- In-memory dedup = lost on restart
+- Production needs: Domain+SSL, Redis/Postgres dedup
 
 ---
 
