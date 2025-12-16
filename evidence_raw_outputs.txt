@@ -1,0 +1,429 @@
+================================================================================
+PROJECT 38 V2 - RAW EVIDENCE COLLECTION
+Generated: 2025-12-16 16:40:00 UTC
+Purpose: Verify audit findings from Repo Dump analysis
+Notes: All secret VALUES redacted. Metadata (names, states, timestamps) only.
+================================================================================
+
+
+================================================================================
+SECTION 1: GCLOUD DEFAULT PROJECT (DRIFT CHECK)
+================================================================================
+
+Purpose: Verify default project to assess "runs on wrong project" risk
+
+---
+
+Command: gcloud config get-value project
+Output:
+edri2or-mcp
+
+---
+
+Command: gcloud config list --format="text(core.project)"
+Output:
+core.project: edri2or-mcp
+
+---
+
+Command: gcloud projects list --filter="projectId~project-38" --format="value(projectId)"
+Output:
+project-38-ai-prod
+project-38-ai
+
+FINDING: Default project is "edri2or-mcp" (NOT project-38-ai)
+RISK: Commands without --project flag will operate on wrong project
+
+
+================================================================================
+SECTION 2: SECRETS VERSIONS (NO PLACEHOLDER CHECK)
+================================================================================
+
+Purpose: Confirm "2 ENABLED versions per secret" without exposing payloads
+
+---
+
+Command: gcloud secrets list --project=project-38-ai --format="table(name,labels,createTime)"
+Output:
+NAME                LABELS  CREATED
+anthropic-api-key           2025-12-14T13:53:34
+gemini-api-key              2025-12-14T13:54:08
+github-pat                  2025-12-14T13:53:46
+n8n-encryption-key          2025-12-14T13:53:52
+openai-api-key              2025-12-14T13:53:41
+postgres-password           2025-12-14T13:54:01
+telegram-bot-token          2025-12-14T13:54:15
+
+---
+
+Per-Secret Version Lists (7 secrets total):
+
+---
+
+1. anthropic-api-key
+Command: gcloud secrets versions list anthropic-api-key --project=project-38-ai --format="table(name,state,createTime)"
+Output:
+NAME  STATE    CREATED
+2     enabled  2025-12-14T13:55:52
+1     enabled  2025-12-14T13:53:37
+
+---
+
+2. gemini-api-key
+Command: gcloud secrets versions list gemini-api-key --project=project-38-ai --format="table(name,state,createTime)"
+Output:
+NAME  STATE    CREATED
+2     enabled  2025-12-14T13:56:19
+1     enabled  2025-12-14T13:54:11
+
+---
+
+3. github-pat
+Command: gcloud secrets versions list github-pat --project=project-38-ai --format="table(name,state,createTime)"
+Output:
+NAME  STATE    CREATED
+2     enabled  2025-12-14T13:56:04
+1     enabled  2025-12-14T13:53:49
+
+---
+
+4. n8n-encryption-key
+Command: gcloud secrets versions list n8n-encryption-key --project=project-38-ai --format="table(name,state,createTime)"
+Output:
+NAME  STATE    CREATED
+2     enabled  2025-12-14T13:56:08
+1     enabled  2025-12-14T13:53:55
+
+---
+
+5. openai-api-key
+Command: gcloud secrets versions list openai-api-key --project=project-38-ai --format="table(name,state,createTime)"
+Output:
+NAME  STATE    CREATED
+2     enabled  2025-12-14T13:55:58
+1     enabled  2025-12-14T13:53:43
+
+---
+
+6. postgres-password
+Command: gcloud secrets versions list postgres-password --project=project-38-ai --format="table(name,state,createTime)"
+Output:
+NAME  STATE    CREATED
+2     enabled  2025-12-14T13:56:14
+1     enabled  2025-12-14T13:54:04
+
+---
+
+7. telegram-bot-token
+Command: gcloud secrets versions list telegram-bot-token --project=project-38-ai --format="table(name,state,createTime)"
+Output:
+NAME  STATE    CREATED
+2     enabled  2025-12-14T13:56:24
+1     enabled  2025-12-14T13:54:18
+
+FINDING: All 7 secrets have exactly 2 ENABLED versions
+FINDING: No disabled/destroyed versions (no placeholders)
+FINDING: Version 1 created ~13:53-13:54, Version 2 created ~13:55-13:56 (2-min gap)
+
+================================================================================
+SECTION 3: VM PERMISSIONS (chmod 777 VERIFICATION)
+================================================================================
+
+Purpose: Confirm actual permissions + whether /opt/project38 exists
+
+---
+
+Command: id
+Output (via SSH to p38-dev-vm-01):
+uid=1001(edri2) gid=1002(edri2) groups=1002(edri2),4(adm),20(dialout),24(cdrom),25(floppy),29(audio),30(dip),44(video),46(plugdev),105(lxd),111(netdev),988(docker),1000(ubuntu),1001(google-sudoers)
+
+---
+
+Command: pwd
+Output (via SSH to p38-dev-vm-01):
+/home/edri2
+
+---
+
+Command: ls -ld /home/edri2
+Output (via SSH to p38-dev-vm-01):
+drwxr-x--- 6 edri2 edri2 4096 Dec 16 11:18 /home/edri2
+
+---
+
+Command: ls -ld /home/edri2/*
+Output (via SSH to p38-dev-vm-01):
+drwx------ 2 edri2 edri2 4096 Dec 15 09:17 /home/edri2/.cache
+drwxrwxr-x 3 edri2 edri2 4096 Dec 15 09:50 /home/edri2/.config
+drwx------ 2 edri2 edri2 4096 Dec 15 09:24 /home/edri2/.ssh
+drwx------ 3 edri2 edri2 4096 Dec 15 09:50 /home/edri2/snap
+-rw-rw-r-- 1 edri2 edri2 1048 Dec 16 11:16 /home/edri2/docker-compose.yml
+-rwxrwxr-x 1 edri2 edri2  835 Dec 16 11:18 /home/edri2/load-secrets.sh
+
+---
+
+Command: test -d /opt/project38 && ls -ld /opt/project38 || echo "/opt/project38 does not exist"
+Output (via SSH to p38-dev-vm-01):
+/opt/project38 does not exist
+
+---
+
+Command: ls -la /opt/
+Output (via SSH to p38-dev-vm-01):
+total 12
+drwxr-xr-x  3 root root 4096 Dec 15 09:43 .
+drwxr-xr-x 22 root root 4096 Dec 15 09:14 ..
+drwx--x--x  4 root root 4096 Dec 15 09:43 containerd
+
+FINDING: /opt/project38 does NOT exist
+FINDING: Deployment is in /home/edri2 (not /opt)
+FINDING: docker-compose.yml permissions: 664 (rw-rw-r--)
+FINDING: load-secrets.sh permissions: 775 (rwxrwxr-x)
+FINDING: No world-writable (777) permissions found
+FINDING: User edri2 has docker group (988)
+
+================================================================================
+SECTION 4: WHICH SCRIPT ACTUALLY RAN
+================================================================================
+
+Purpose: Prove which deployment path is "canonical" in practice
+
+---
+
+Command: cat C:\Users\edri2\project_38\deployment\n8n\load-secrets.sh
+Output:
+#!/bin/bash
+set -euo pipefail
+
+PROJECT_ID="project-38-ai"
+
+echo "[$(date -u +"%Y-%m-%d %H:%M:%S UTC")] Fetching secrets from GCP Secret Manager..."
+
+# Fetch secrets (n8n-runtime SA has access to these 3 only)
+export POSTGRES_PASSWORD=$(gcloud secrets versions access latest --secret=postgres-password --project=$PROJECT_ID)
+export N8N_ENCRYPTION_KEY=$(gcloud secrets versions access latest --secret=n8n-encryption-key --project=$PROJECT_ID)
+export TELEGRAM_BOT_TOKEN=$(gcloud secrets versions access latest --secret=telegram-bot-token --project=$PROJECT_ID)
+
+echo "[$(date -u +"%Y-%m-%d %H:%M:%S UTC")] Secrets loaded (3/3). Starting Docker Compose..."
+
+# Start services with secrets as environment variables
+docker compose up -d
+
+echo "[$(date -u +"%Y-%m-%d %H:%M:%S UTC")] Services started. Use 'docker compose ps' to check status."
+
+---
+
+Command: Select-String -Path "C:\Users\edri2\project_38\startup.sh" -Pattern "chmod 777"
+Output:
+C:\Users\edri2\project_38\startup.sh:63:    chmod 777 /opt/project38
+
+---
+
+Command (on VM): cat /home/edri2/load-secrets.sh (first 3 lines)
+Output:
+#!/bin/bash
+set -euo pipefail
+PROJECT_ID="project-38-ai"
+
+FINDING: load-secrets.sh is the canonical deployment script (in use)
+FINDING: startup.sh contains "chmod 777 /opt/project38" at line 63
+FINDING: startup.sh was NOT executed on VM (no /opt/project38 directory)
+FINDING: Actual deployment uses /home/edri2 with normal permissions
+
+================================================================================
+SECTION 5: DOCKER DETERMINISM (DIGESTS + :latest CHECK)
+================================================================================
+
+Purpose: Confirm digests in use + compare against :latest in config
+
+---
+
+Command: docker ps --format "table {{.Names}}\t{{.Image}}\t{{.Ports}}\t{{.Status}}"
+Output (via SSH to p38-dev-vm-01):
+NAMES         IMAGE                PORTS                      STATUS
+p38-n8n       n8nio/n8n:latest     127.0.0.1:5678->5678/tcp   Up 5 hours
+p38-postgres  postgres:16-alpine   5432/tcp                   Up 5 hours
+
+---
+
+Command: docker images
+Output (via SSH to p38-dev-vm-01):
+IMAGE                ID             DISK USAGE   CONTENT SIZE
+n8nio/n8n:latest     e3a4256dd2aa       1.82GB          297MB
+postgres:16-alpine   a5074487380d        395MB          111MB
+
+---
+
+Command: docker inspect p38-n8n --format '{{.Image}} {{.RepoDigests}}'
+Output (via SSH to p38-dev-vm-01):
+sha256:e3a4256dd2aa3b987e10da3c1194081575933987b26a604a4f52d2bdd62a5b72 [n8nio/n8n@sha256:e3a4256dd2aa3b987e10da3c1194081575933987b26a604a4f52d2bdd62a5b72]
+
+---
+
+Command: docker inspect p38-postgres --format '{{.Image}} {{.RepoDigests}}'
+Output (via SSH to p38-dev-vm-01):
+sha256:a5074487380d4e686036ce61ed6f2d363939ae9a0c40123d1a9e3bb3a5f344b4 [postgres@sha256:a5074487380d4e686036ce61ed6f2d363939ae9a0c40123d1a9e3bb3a5f344b4]
+
+---
+
+Command: cat deployment/n8n/docker-compose.yml (image tags only)
+Output:
+services:
+  postgres:
+    image: postgres:16-alpine
+  n8n:
+    image: n8nio/n8n:latest
+
+FINDING: Both containers using :latest tags (non-deterministic)
+FINDING: Digests captured:
+  - n8n: sha256:e3a4256dd2aa3b987e10da3c1194081575933987b26a604a4f52d2bdd62a5b72
+  - postgres: sha256:a5074487380d4e686036ce61ed6f2d363939ae9a0c40123d1a9e3bb3a5f344b4
+FINDING: Containers stable (Up 5 hours)
+RISK: :latest can change in future pulls
+
+================================================================================
+SECTION 6: NETWORK EXPOSURE
+================================================================================
+
+Purpose: Confirm listeners (localhost vs public) + verify "no listener on port 80"
+
+---
+
+Command: ss -lntp | grep -E "(:5678|:80|:443)" || true
+Output (via SSH to p38-dev-vm-01):
+LISTEN 0      4096       127.0.0.1:5678      0.0.0.0:*
+
+FINDING: Port 5678 bound to 127.0.0.1 ONLY (localhost)
+FINDING: No listener on port 80 (HTTP)
+FINDING: No listener on port 443 (HTTPS)
+FINDING: No public network exposure
+
+
+================================================================================
+SECTION 7: EVIDENCE STORE EXISTS?
+================================================================================
+
+Purpose: Confirm manifest still PLACEHOLDER and evidence_store not created
+
+---
+
+Command: Test-Path "C:\Users\edri2\project_38__evidence_store"
+Output:
+False
+
+---
+
+Command: Get-Item "C:\Users\edri2\project_38\docs\evidence\manifest.md" | Select-Object Length, LastWriteTime
+Output:
+Length LastWriteTime        
+------ -------------        
+  8965 12/16/2025 3:39:29 PM
+
+---
+
+Command: Select-String -Path "C:\Users\edri2\project_38\docs\evidence\manifest.md" -Pattern "PLACEHOLDER" | Select-Object -First 5
+Output:
+docs\evidence\manifest.md:8:| 01 | VM creation output | phase-2/slice-01/vm_create_raw.txt | 2025-12-15 10:23:00 | PLACEHOLDER | PLACEHOLDER |
+docs\evidence\manifest.md:9:| 02 | Firewall rule creation | phase-2/slice-01/firewall_create_raw.txt | 2025-12-15 10:24:00 | PLACEHOLDER | PLACEHOLDER |
+docs\evidence\manifest.md:10:| 03 | Service account creation | phase-2/slice-01/sa_create_raw.txt | 2025-12-15 10:25:00 | PLACEHOLDER | PLACEHOLDER |
+docs\evidence\manifest.md:11:| 04 | IAM policy binding | phase-2/slice-01/iam_bind_raw.txt | 2025-12-15 10:26:00 | PLACEHOLDER | PLACEHOLDER |
+docs\evidence\manifest.md:12:| 05 | VM SSH test | phase-2/slice-01/ssh_test_raw.txt | 2025-12-15 10:27:00 | PLACEHOLDER | PLACEHOLDER |
+
+---
+
+Command: cat docs/evidence/manifest.md (full file, first 30 lines)
+Output:
+# Evidence Manifest
+
+**Purpose:** Central registry of all execution evidence artifacts for audit trail and reproducibility.
+
+**Structure:** Each entry includes artifact ID, description, file path, timestamp, SHA256 hash.
+
+| ID | Description | File Path | Timestamp | Size | SHA256 |
+|----|-------------|-----------|-----------|------|--------|
+| 01 | VM creation output | phase-2/slice-01/vm_create_raw.txt | 2025-12-15 10:23:00 | PLACEHOLDER | PLACEHOLDER |
+| 02 | Firewall rule creation | phase-2/slice-01/firewall_create_raw.txt | 2025-12-15 10:24:00 | PLACEHOLDER | PLACEHOLDER |
+| 03 | Service account creation | phase-2/slice-01/sa_create_raw.txt | 2025-12-15 10:25:00 | PLACEHOLDER | PLACEHOLDER |
+| 04 | IAM policy binding | phase-2/slice-01/iam_bind_raw.txt | 2025-12-15 10:26:00 | PLACEHOLDER | PLACEHOLDER |
+| 05 | VM SSH test | phase-2/slice-01/ssh_test_raw.txt | 2025-12-15 10:27:00 | PLACEHOLDER | PLACEHOLDER |
+| 06 | Secret creation batch | phase-2/slice-01/secrets_create_raw.txt | 2025-12-15 10:30:00 | PLACEHOLDER | PLACEHOLDER |
+| 07 | Docker install verification | phase-2/slice-02a/docker_install_raw.txt | 2025-12-16 11:15:00 | PLACEHOLDER | PLACEHOLDER |
+| 08 | docker-compose.yml upload | phase-2/slice-02a/compose_upload_raw.txt | 2025-12-16 11:16:00 | PLACEHOLDER | PLACEHOLDER |
+| 09 | load-secrets.sh upload | phase-2/slice-02a/load_script_upload_raw.txt | 2025-12-16 11:17:00 | PLACEHOLDER | PLACEHOLDER |
+| 10 | Secrets fetch execution | phase-2/slice-02a/secrets_fetch_raw.txt | 2025-12-16 11:18:00 | PLACEHOLDER | PLACEHOLDER |
+| 11 | Docker Compose startup | phase-2/slice-02a/compose_up_raw.txt | 2025-12-16 11:18:30 | PLACEHOLDER | PLACEHOLDER |
+| 12 | Service health check | phase-2/slice-02a/health_check_raw.txt | 2025-12-16 11:20:00 | PLACEHOLDER | PLACEHOLDER |
+
+**Notes:**
+- All entries currently marked PLACEHOLDER pending evidence store creation
+- File paths relative to: C:\Users\edri2\project_38__evidence_store\
+- SHA256 hashes to be calculated upon artifact creation
+
+FINDING: Evidence store directory does NOT exist
+FINDING: Manifest exists with 12 PLACEHOLDER entries
+FINDING: No SHA256 hashes calculated
+FINDING: All sizes marked PLACEHOLDER
+
+================================================================================
+SECTION 8: GIT INTEGRITY
+================================================================================
+
+Purpose: Confirm clean + synced repo state
+
+---
+
+Command: git status
+Output:
+On branch main
+Your branch is up to date with 'origin/main'.
+
+nothing to commit, working tree clean
+
+---
+
+Command: git rev-parse HEAD
+Output:
+b8bc2c6db7d5cb1f56738daf1871eca8d03b1b5c
+
+---
+
+Command: git log -1 --oneline
+Output:
+b8bc2c6 docs(session): Add GitHub sync + cleanup entry to session brief
+
+---
+
+Command: git log origin/main..HEAD --oneline
+Output:
+(empty - no unpushed commits)
+
+---
+
+Command: git log -1 --pretty=format:"%H%n%an <%ae>%n%ad%n%s"
+Output:
+b8bc2c6db7d5cb1f56738daf1871eca8d03b1b5c
+edri2or-commits <edri2or@gmail.com>
+Tue Dec 16 16:02:45 2025 +0200
+docs(session): Add GitHub sync + cleanup entry to session brief
+
+FINDING: Working tree clean (no uncommitted changes)
+FINDING: Branch synced with origin/main (no unpushed commits)
+FINDING: Latest commit: b8bc2c6 from 2025-12-16 16:02:45
+
+
+================================================================================
+END OF EVIDENCE COLLECTION
+================================================================================
+
+Summary of Evidence Collected:
+
+SECTION 1: gcloud default = edri2or-mcp (DRIFT confirmed)
+SECTION 2: All 7 secrets have 2 ENABLED versions (NO placeholders)
+SECTION 3: /opt/project38 does NOT exist, chmod 777 NOT executed
+SECTION 4: load-secrets.sh is canonical script (startup.sh unused)
+SECTION 5: Docker using :latest tags, digests captured
+SECTION 6: Port 5678 localhost-only, no listeners on 80/443
+SECTION 7: Evidence store does NOT exist, manifest has PLACEHOLDER entries
+SECTION 8: Git repo clean and synced
+
+All outputs are RAW - no secrets exposed (metadata only).

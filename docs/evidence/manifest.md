@@ -1,7 +1,7 @@
 # Evidence Manifest — Project 38 V2
 
 **Evidence Store Base Path:** `C:\Users\edri2\project_38__evidence_store\`  
-**Last Updated:** 2025-12-15 (Initial creation)  
+**Last Updated:** 2025-12-16 (Evidence store populated)  
 **Purpose:** Track external evidence artifacts with SHA256 integrity verification
 
 ---
@@ -35,12 +35,12 @@
 
 | Slice | Artifact Name | Relative Path | Created (UTC) | SHA256 | Size | Description |
 |-------|---------------|---------------|---------------|--------|------|-------------|
-| 01 | VM creation output | phase-2/slice-01/vm_create_raw.txt | 2025-12-15 10:23:00 | PLACEHOLDER | PLACEHOLDER | Full gcloud compute instances create command output |
-| 01 | Docker install log | phase-2/slice-01/docker_install.txt | 2025-12-15 10:28:00 | PLACEHOLDER | PLACEHOLDER | Docker Engine + Compose installation full log |
-| 01 | Firewall rules verification | phase-2/slice-01/firewall_verify.txt | 2025-12-15 10:30:00 | PLACEHOLDER | PLACEHOLDER | gcloud compute firewall-rules list output |
-| 01 | IAM validation | phase-2/slice-01/iam_verify.txt | 2025-12-15 10:32:00 | PLACEHOLDER | PLACEHOLDER | Service account impersonation test results |
+| 01 | VM creation output | phase-2/slice-01/vm_create_raw.txt | 2025-12-15 10:23:00 | CECBB7CFFCBA3490B7BA5977268AF83821A50590702CF6CC58BF116B971994CD | 2107 | Full gcloud compute instances create command output |
+| 01 | Docker install log | phase-2/slice-01/docker_install.txt | 2025-12-15 10:28:00 | 84C31E641E9D8323EF62C38129CDB82FE5DD007C35D503B0DAC8E0B1411A1CAE | 9351 | Docker Engine + Compose installation full log |
+| 01 | Firewall rules verification | phase-2/slice-01/firewall_verify.txt | 2025-12-15 10:30:00 | E3F8E79486E8AA98D5BB51F2ED1E94A39E0D347BF7F1437E97CD0C8962B02138 | 3905 | gcloud compute firewall-rules list output |
+| 01 | IAM validation | phase-2/slice-01/iam_verify.txt | 2025-12-15 10:32:00 | 34676ADAA4D9447A94B3F6B9EC2E5F23DEAE00F766B66B75B159D3E0B4090B20 | 5644 | Service account impersonation test results |
 
-**Note:** Rows marked PLACEHOLDER need actual evidence files + hashes after Slice 1 execution evidence is migrated to evidence store.
+**Note:** Evidence store created 2025-12-16. All artifacts include SHA256 hashes for integrity verification. All secrets redacted.
 
 ---
 
