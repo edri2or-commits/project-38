@@ -1,6 +1,6 @@
 # Project Facts — Project 38 (V2)
 
-**Last Updated:** 2025-12-15  
+**Last Updated:** 2025-12-16  
 **System:** Project 38 (V2) — NEW system  
 **Legacy:** AIOS (V1) — Reference only
 
@@ -10,7 +10,7 @@
 
 - **NEW System:** Project 38 (V2)
 - **Legacy System:** AIOS (V1)
-- **Current Phase:** PRE-BUILD (Planning + Bootstrap)
+- **Current Phase:** Phase 2 — Infrastructure & Deployment
 - **Primary Google Account:** edri2or@gmail.com
 
 ---
@@ -20,8 +20,9 @@
 ### DEV Environment
 - **Project ID:** `project-38-ai`
 - **Purpose:** Development, testing, validation
-- **Status:** Active, secrets + IAM configured
-- **Region:** (to be determined in Slice 1)
+- **Status:** Active
+- **Region:** us-central1
+- **Infrastructure:** Slice 1 COMPLETE (VM + Docker + IAM verified)
 
 ### PROD Environment
 - **Project ID:** `project-38-ai-prod`
@@ -71,6 +72,7 @@
   C:\Users\edri2\project_38\
   ├── docs/
   │   ├── context/           ← Context snapshots (this file is here)
+  │   ├── sessions/          ← Session logs
   │   └── drive_updates/
   │       └── pending/       ← Drive update requests
   ├── infra/                 ← Infrastructure configs (future)
@@ -92,14 +94,14 @@
 
 ### DEV (project-38-ai)
 | Service Account | Email | Purpose |
-|-----------------|-------|---------|
+|-----------------|-------|---------||
 | github-actions-deployer | github-actions-deployer@project-38-ai.iam.gserviceaccount.com | CI/CD deployments |
 | n8n-runtime | n8n-runtime@project-38-ai.iam.gserviceaccount.com | N8N workflow engine |
 | kernel-runtime | kernel-runtime@project-38-ai.iam.gserviceaccount.com | Kernel/Agent service |
 
 ### PROD (project-38-ai-prod)
 | Service Account | Email | Purpose |
-|-----------------|-------|---------|
+|-----------------|-------|---------||
 | github-actions-deployer | github-actions-deployer@project-38-ai-prod.iam.gserviceaccount.com | CI/CD deployments |
 | n8n-runtime | n8n-runtime@project-38-ai-prod.iam.gserviceaccount.com | N8N workflow engine |
 | kernel-runtime | kernel-runtime@project-38-ai-prod.iam.gserviceaccount.com | Kernel/Agent service |
@@ -159,27 +161,32 @@
 6. `postgres-password` — Database credentials
 7. `telegram-bot-token` — Telegram bot integration
 
-**Status:** SYNC_OK / FINAL_OK  
+**Status:** SYNC_OK / FINAL_OK / IAM_OK  
 **Evidence:** See `secret_sync_history.md`
 
 ---
 
 ## Phase Status
 
-**Current:** PRE-BUILD (documentation only)  
-**Next:** Slice 1 — DEV Infrastructure Setup (when instructed)
+**Current:** Phase 2 — Infrastructure & Deployment  
+**Last Completed:** Slice 1 — VM Baseline (2025-12-15)  
+**Next:** Slice 2A — N8N Deployment (awaiting execution approval)
 
 **Completed:**
 - ✅ GCP projects created
-- ✅ Secrets configured (SYNC_OK / FINAL_OK)
-- ✅ IAM configured (IAM_OK)
+- ✅ Secrets configured (7×2 projects, 2 ENABLED versions each)
+- ✅ IAM configured (3 SA per project, least privilege)
 - ✅ Context documentation created
+- ✅ Slice 1: DEV Infrastructure (VM: p38-dev-vm-01, Docker v29.1.3, Static IP: 136.111.39.139)
 
 **Pending:**
-- 🔄 Slice 1: VM baseline (single VM + Docker + firewall + secret validation)
-- 🔄 Slice 2: Workload deployment (N8N + Kernel via Docker Compose)
-- 🔄 Slice 3: Testing & validation
-- ⏸️ Optional/Deferred: Advanced infrastructure (Cloud SQL, Cloud NAT, custom VPC) — only if scaling/managed DB required
+- 📋 Slice 2A: N8N deployment (runbook ready, awaiting "Execute Slice 2A")
+- ⏸️ Slice 2B/3: Kernel deployment (deferred - SA architecture decision needed)
+- 📋 Slice 3: Testing & validation
+- ⏸️ Slice 4: PROD mirror (after DEV validation)
+
+**Deferred:**
+- ⏸️ Advanced infrastructure (Cloud SQL, Cloud NAT, custom VPC) — only if scaling/managed DB required
 
 ---
 
@@ -209,4 +216,4 @@ Always work in the NEW workspace unless explicitly told to access legacy.
 - **Google Account:** edri2or@gmail.com
 - **GitHub Account:** edri2or-commits
 - **GCP Access:** Owner/Editor roles (as needed)
-- **Drive SSOT:** Read-only reference (no auto-sync)
+- **Drive SSOT:** DEPRECATED (repo is SSOT now)
