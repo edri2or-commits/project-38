@@ -1,6 +1,6 @@
 # Operating Rules — Project 38 (V2)
 
-**Last Updated:** 2025-12-15  
+**Last Updated:** 2025-12-16  
 **Scope:** Anti-chaos rules for Project 38 operations
 
 ---
@@ -438,6 +438,190 @@ Every Slice generates an execution log:
 4. All sections filled (timestamps, commands, outputs, verification)
 5. Stop condition check passed
 6. Traceability matrix updated with evidence link
+
+---
+
+## Rule 12: GitHub Autonomy (FULL ACCESS)
+
+**Status:** Claude has FULL autonomous access to GitHub operations.
+
+### Available Tools
+
+Claude has 2 independent methods to interact with GitHub:
+
+#### Method 1: GitHub MCP Tool (Preferred for Multi-File Operations)
+**Tool Name:** `github:push_files`
+
+**Capabilities:**
+- ✅ Push multiple files in a single atomic commit
+- ✅ Create/update/delete files on any branch
+- ✅ Automatic commit with custom message
+- ✅ Direct push to main (no PR required)
+- ✅ Full file content manipulation
+
+**Example:**
+```javascript
+github:push_files({
+  branch: "main",
+  owner: "edri2or-commits",
+  repo: "project-38",
+  message: "Fix: Update documentation",
+  files: [
+    {path: "README.md", content: "..."},
+    {path: "docs/file.md", content: "..."}
+  ]
+})
+```
+
+**Other GitHub MCP Tools:**
+- `github:create_or_update_file` - Single file operations
+- `github:create_pull_request` - For review workflows
+- `github:create_branch` - Branch management
+- All read operations (get_file_contents, list_commits, etc.)
+
+#### Method 2: Desktop Commander + Git CLI (Alternative)
+**Tool Name:** `Desktop Commander:start_process`
+
+**Capabilities:**
+- ✅ Full git command-line access
+- ✅ Local repository operations
+- ✅ Complex git workflows (rebase, cherry-pick, etc.)
+- ✅ Direct shell access to git
+
+**Example:**
+```bash
+cd C:\Users\edri2\project_38
+git add .
+git commit -m "Fix: Update documentation"
+git push origin main
+```
+
+### Operating Model
+
+**Claude's Authority:**
+- ✅ Claude can prepare all changes (fixes, updates, new files)
+- ✅ Claude can stage all changes locally
+- ✅ Claude can create commit messages
+- ✅ Claude requests user approval ONLY for: `git push` or GitHub MCP push operations
+- ✅ After approval, Claude executes the push immediately
+
+**User Approval Required For:**
+1. **Git Push** - Pushing commits to GitHub
+2. **PR Creation** - Creating pull requests (if needed)
+3. **Branch Operations** - Creating/deleting branches (if non-standard)
+
+**User Approval NOT Required For:**
+- File modifications (local)
+- Documentation updates (local)
+- Code fixes (local)
+- Git staging/committing (local)
+- Reading GitHub content
+- Analyzing repository state
+
+### Decision Tree: When to Use Each Method
+
+**Use GitHub MCP (push_files) when:**
+- ✅ Updating 1-10 files simultaneously
+- ✅ Need atomic commit (all or nothing)
+- ✅ Simple, straightforward file updates
+- ✅ Don't need complex git operations
+- ✅ Want cleaner tool call syntax
+
+**Use Desktop Commander + Git CLI when:**
+- ✅ Complex git operations (rebase, merge, cherry-pick)
+- ✅ Need to see git diff before push
+- ✅ Working with git history
+- ✅ Need granular control over staging
+- ✅ Debugging git issues
+
+### Approval Protocol
+
+**Standard Workflow:**
+1. User requests change (e.g., "fix fetch_secrets.sh scope issue")
+2. Claude analyzes and prepares fixes
+3. Claude shows summary of changes
+4. Claude asks: "Push to GitHub?" (yes/no/modify)
+5. User approves with "yes" or "כן"
+6. Claude executes push using chosen method
+7. Claude confirms with commit SHA
+
+**Example Dialogue:**
+```
+User: תקן את fetch_secrets.sh
+Claude: [analyzes, creates fix]
+        מוכן לדחוף ל-GitHub:
+        - fetch_secrets.sh: הוספת scope parameter
+        Commit: "Fix: Add scope parameter to fetch_secrets"
+        אישור? (כן/לא)
+User: כן
+Claude: [pushes to GitHub]
+        ✅ Pushed: commit b82c688
+```
+
+### What Claude Documents
+
+**After Every Push:**
+Claude must create a session log entry in:
+- **Location:** `docs/sessions/YYYY-MM-DD_session_brief.md`
+
+**Required Contents:**
+1. **Date/Time:** ISO 8601 timestamp
+2. **Action:** What was done (e.g., "Fixed 4 files + pushed to GitHub")
+3. **Files Changed:** List with brief description
+4. **Commit SHA:** GitHub commit ID
+5. **Rationale:** Why each change was made
+6. **Impact:** What this fixes or enables
+
+**Example Log Entry:**
+```markdown
+## 2025-12-16 10:30 UTC - GitHub Repo Fixes
+
+**Action:** Fixed 4 critical issues + pushed to GitHub
+
+**Files Changed:**
+1. fetch_secrets.sh - Added scope parameter (n8n|kernel|all)
+2. startup.sh - Removed apt-get upgrade (timeout prevention)
+3. README.md - Removed duration estimate
+4. docs/context/phase_status.md - Updated to Slice 1 DONE
+
+**Commit:** b82c6889a107d6e08a3640c516ef0fa05d3e2da6
+**Link:** https://github.com/edri2or-commits/project-38/commit/b82c688
+
+**Rationale:**
+- fetch_secrets.sh: n8n-runtime SA only has access to 3 secrets, not 7
+- startup.sh: Documented timeout issues in Slice 1 execution
+- README.md: User decision to remove time estimates from SoT
+- phase_status.md: Sync with actual state (Slice 1 complete)
+
+**Impact:**
+- ✅ Slice 2A will now work (scope fix critical)
+- ✅ VM startup more reliable (no timeout)
+- ✅ Documentation accurate (reflects reality)
+```
+
+### Session Logs Directory Structure
+```
+docs/sessions/
+├── 2025-12-15_session_brief.md  (Slice 1 execution)
+├── 2025-12-16_session_brief.md  (Today's fixes)
+└── README.md                     (Index of all sessions)
+```
+
+### Security Notes
+
+**Claude Never:**
+- ❌ Pushes secret values to GitHub
+- ❌ Commits sensitive credentials
+- ❌ Pushes to wrong repository
+- ❌ Pushes without user approval for final push operation
+- ❌ Modifies git history without explicit instruction
+
+**Claude Always:**
+- ✅ Redacts secrets before any git operation
+- ✅ Verifies repository URL before push
+- ✅ Uses correct branch (usually main)
+- ✅ Provides clear commit messages
+- ✅ Documents all pushes in session logs
 
 ---
 
