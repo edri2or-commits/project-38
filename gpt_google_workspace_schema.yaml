@@ -1,0 +1,310 @@
+openapi: 3.1.0
+info:
+  title: Google Workspace API
+  version: 2.2.0
+  description: Complete Google Workspace automation
+
+servers:
+  # IMPORTANT: Replace with your actual Cloud Run URL
+  # Format: https://SERVICE_NAME-PROJECT_NUMBER.REGION.run.app
+  # Find your URL: gcloud run services describe google-workspace-api --region=us-central1 --format='value(status.url)'
+  - url: https://REPLACE_WITH_YOUR_CLOUD_RUN_URL
+
+paths:
+  /gmail/send:
+    post:
+      operationId: sendEmail
+      summary: Send an email via Gmail
+      description: שלח אימייל דרך Gmail
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [to, subject, body]
+              properties:
+                to:
+                  type: string
+                  description: כתובת מייל של הנמען
+                subject:
+                  type: string
+                  description: נושא האימייל
+                body:
+                  type: string
+                  description: תוכן האימייל
+      responses:
+        '200':
+          description: Email sent successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  message:
+                    type: string
+
+  /gmail/list:
+    post:
+      operationId: listEmails
+      summary: List recent emails
+      description: קבל רשימת אימיילים אחרונים
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                max_results:
+                  type: integer
+                  default: 10
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  emails:
+                    type: array
+                    items:
+                      type: object
+
+  /sheets/create:
+    post:
+      operationId: createSheet
+      summary: Create a new Google Sheet
+      description: צור גיליון אלקטרוני חדש
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title]
+              properties:
+                title:
+                  type: string
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  spreadsheet_id:
+                    type: string
+                  url:
+                    type: string
+
+  /sheets/read:
+    post:
+      operationId: readSheet
+      summary: Read data from a Google Sheet
+      description: קרא נתונים מגיליון אלקטרוני
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [spreadsheet_id]
+              properties:
+                spreadsheet_id:
+                  type: string
+                range:
+                  type: string
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  values:
+                    type: array
+                    items:
+                      type: array
+
+  /docs/create:
+    post:
+      operationId: createDoc
+      summary: Create a new Google Doc
+      description: צור מסמך חדש
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title]
+              properties:
+                title:
+                  type: string
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  document_id:
+                    type: string
+                  url:
+                    type: string
+
+  /drive/search:
+    post:
+      operationId: searchDrive
+      summary: Search files in Google Drive
+      description: חפש קבצים ב-Google Drive
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [query]
+              properties:
+                query:
+                  type: string
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  files:
+                    type: array
+                    items:
+                      type: object
+
+  /calendar/create-event:
+    post:
+      operationId: createEvent
+      summary: Create a calendar event
+      description: צור אירוע ביומן
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [summary, start_time, end_time]
+              properties:
+                summary:
+                  type: string
+                start_time:
+                  type: string
+                end_time:
+                  type: string
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  event_id:
+                    type: string
+                  url:
+                    type: string
+
+  /calendar/list-events:
+    post:
+      operationId: listEvents
+      summary: List upcoming calendar events
+      description: קבל רשימת אירועים קרובים
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                max_results:
+                  type: integer
+                  default: 10
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  events:
+                    type: array
+                    items:
+                      type: object
+
+  /tasks/create:
+    post:
+      operationId: createTask
+      summary: Create a Google Task
+      description: צור משימה חדשה
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title]
+              properties:
+                title:
+                  type: string
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  task_id:
+                    type: string
+
+  /github/update-file:
+    post:
+      operationId: githubUpdateFile
+      summary: Update or create a file in a GitHub repo
+      description: עדכן או צור קובץ ב-GitHub
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [repo, branch, path, content, message]
+              properties:
+                repo:
+                  type: string
+                  description: "owner/repo"
+                branch:
+                  type: string
+                path:
+                  type: string
+                content:
+                  type: string
+                message:
+                  type: string
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  commit_sha:
+                    type: string
+                  url:
+                    type: string
