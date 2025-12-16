@@ -8,10 +8,9 @@ set -euo pipefail
 echo "🚀 Project 38 V2 - VM Startup"
 echo "   Starting Docker installation..."
 
-# Update system
-echo "📦 Updating system packages..."
+# Update package lists only (no full upgrade to avoid timeouts)
+echo "📦 Updating package lists..."
 apt-get update
-apt-get upgrade -y
 
 # Install dependencies
 echo "📦 Installing prerequisites..."

@@ -140,7 +140,7 @@ Use this format for consistency:
 **Current verified hashes (2025-12-15):**
 
 | File | SHA256 (first 64 chars) | Size | Purpose |
-|------|-------------------------|------|---------|
+|------|-------------------------|------|---------||
 | slice-02a_runbook.md | 3C26E6A0BE30D7A8E43B97087896A50EDB07F41BBFB43B5837347B084676931E | 20,664 bytes | N8N deployment steps |
 | slice-02a_evidence_pack.md | 7211B93373C3085096AFCE3183FD4AEAD55832E3CD00E061E75DD9670B7A7170 | 9,180 bytes | Evidence template |
 | slice-02a_rollback_plan.md | 71F5146C7A0921F91F4DCE020BC4D35B746BA1F7C775367C554C71C18ADA06E0 | 11,300 bytes | Rollback procedures |
@@ -267,7 +267,7 @@ Claude needs these files to operate correctly:
 ## Version History
 
 | Date | Version | Changes |
-|------|---------|---------|
+|------|---------|---------||
 | 2025-12-15 | 1.0 | Initial creation (Drive deprecation) |
 
 ---
