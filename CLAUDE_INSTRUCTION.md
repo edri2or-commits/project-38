@@ -29,47 +29,42 @@
 
 **Before ANY work, at the start of EVERY conversation:**
 
-1. **Read these 3 files:**
+1. **Read these files:**
    - `docs/context/project_facts.md`
    - `docs/context/operating_rules.md`
+   - `docs/context/phase_status.md`
    - `docs/traceability_matrix.md`
 
 2. **Print Snapshot (5-8 lines):**
    ```
    📸 Snapshot:
-   ✅ DONE: [key completed items]
+   ✅ DONE: [completed items]
    📋 NEXT: [immediate next step]
    ⏸️ DEFERRED: [postponed items]
-   🎯 Ready to: [what you'll do based on user request]
+   🎯 Ready to: [action based on user request]
    ```
 
-3. **STOP** — Wait for user instruction before any execution/deployment
+3. **STOP** — Wait for user instruction before execution/deployment
 
 ---
 
 ## Source of Truth
 
-**All facts, status, and decisions live in the repo files:**
-- `docs/context/project_facts.md` — Immutable facts (GCP projects, secrets, SA, repos)
-- `docs/context/operating_rules.md` — Operating rules (12 rules)
-- `docs/context/phase_status.md` — Current phase and slice status
-- `docs/traceability_matrix.md` — Component status + evidence
+**All facts, status, and decisions live in repo files.**
 
-**If a fact is not in these files:** It is unknown. Ask for clarification, do not guess.
+If a fact is not in these files: It is unknown. Ask for clarification, do not guess.
 
 ---
 
 ## Security (ZERO TOLERANCE)
 
-- **Secrets:** Never expose values in chat, files, Git, or logs
-- **Metadata only:** Show names, versions, ENABLED/DISABLED status (with redaction)
-- **Secrets + IAM:** Already DONE — do not recreate
+- Secrets: Never expose values
+- Show metadata only (names, versions, status) with redaction
+- See `project_facts.md` for secrets/IAM status
 
 ---
 
 ## GitHub Autonomy
-
-**Tools:** GitHub MCP (`push_files`) + Desktop Commander Git CLI
 
 **Approval required ONLY for:**
 - `git push` or GitHub MCP push
@@ -78,18 +73,16 @@
 
 **No approval needed for:**
 - Local file modifications
-- Documentation updates
-- Code fixes
 - Git staging/committing
 
-**After every push:** Create session log in `docs/sessions/YYYY-MM-DD_session_brief.md`
+**After every push:** Create session log in `docs/sessions/`
 
 ---
 
 ## Default Behavior
 
 **PRE-BUILD mode:** Planning + documentation only  
-**Execution mode:** Only when user explicitly approves (e.g., "Execute Slice 2A")
+**Execution mode:** Only when user explicitly approves
 
 ---
 
@@ -97,7 +90,6 @@
 
 - **Default:** Hebrew (עברית)
 - **Style:** Short, direct, structured
-- **Commands:** Copy-paste blocks
 - **No guessing:** Evidence-first, SoT-first
 
 ---
@@ -105,16 +97,15 @@
 ## Rules Summary
 
 1. ❌ Never create GCP resources without explicit approval
-2. ❌ Never use GCP projects other than `project-38-ai` or `project-38-ai-prod`
-3. ❌ Never write to Legacy workspace without `LEGACY_WRITE_OK`
+2. ❌ Never use GCP projects other than `project-38-ai` / `project-38-ai-prod`
+3. ❌ Never write to Legacy without `LEGACY_WRITE_OK`
 4. ❌ Never expose secret values
-5. ❌ Never recreate secrets/IAM (already DONE)
-6. ✅ Always read SoT files at session start
-7. ✅ Always print Snapshot before work
-8. ✅ Always use `--project` flag in gcloud commands
-9. ✅ Always get approval before git push
-10. ✅ Always create session log after push
+5. ✅ Always read SoT files at session start
+6. ✅ Always print Snapshot before work
+7. ✅ Always use `--project` flag in gcloud commands
+8. ✅ Always get approval before git push
+9. ✅ Always create session log after push
 
 ---
 
-**For complete rules:** See `docs/context/operating_rules.md` (Rule 1-12)
+**For complete details:** See `docs/context/operating_rules.md`
