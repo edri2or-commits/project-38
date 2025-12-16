@@ -1,0 +1,94 @@
+# POC-01 Evidence: After Activation
+
+## Date: 2025-12-16T21:25:00Z
+## VM: p38-dev-vm-01 (136.111.39.139)
+
+---
+
+## Commands Executed
+
+```bash
+# 1. Import workflow
+docker cp /tmp/clean_webhook.json p38-n8n:/tmp/clean_webhook.json
+docker exec p38-n8n n8n import:workflow --input=/tmp/clean_webhook.json
+
+# Output:
+# Importing 1 workflows...
+# Successfully imported 1 workflow.
+
+# 2. Get new workflow ID
+docker exec p38-n8n n8n list:workflow | grep "POC Clean"
+# Output: 7rWTnjXLuT3mEpG0|POC Clean Webhook
+
+# 3. Create history record
+docker exec p38-postgres psql -U n8n -d n8n -c "
+  INSERT INTO workflow_history 
+    (\"versionId\", \"workflowId\", authors, \"createdAt\", \"updatedAt\", nodes, connections, name, autosaved)
+  SELECT 
+    'v1-clean', id, '[]', NOW(), NOW(), nodes, connections, name, false 
+  FROM workflow_entity 
+  WHERE name='POC Clean Webhook';"
+# Output: INSERT 0 1
+
+# 4. Set active + activeVersionId
+docker exec p38-postgres psql -U n8n -d n8n -c "
+  UPDATE workflow_entity 
+  SET active=true, \"activeVersionId\"='v1-clean' 
+  WHERE name='POC Clean Webhook';"
+# Output: UPDATE 1
+
+# 5. Restart
+docker restart p38-n8n
+# Output: p38-n8n
+```
+
+---
+
+## DB State After Fix
+
+### workflow_entity
+```
+        id        |       name        | active | activeVersionId 
+------------------+-------------------+--------+-----------------
+ 7rWTnjXLuT3mEpG0 | POC Clean Webhook | t      | v1-clean
+(1 row)
+```
+
+### n8n Startup Log
+```
+Start Active Workflows:
+Activated workflow "POC Headless Webhook Test" (ID: 7nYXJ6vmJrsC8do9)
+Activated workflow "POC Clean Webhook" (ID: 7rWTnjXLuT3mEpG0)
+```
+
+---
+
+## Webhook Test (SUCCESS)
+
+```bash
+$ curl -s http://localhost:5678/webhook/poc-clean
+{"message":"Workflow was started"}
+
+$ curl -s -o /dev/null -w "%{http_code}" http://localhost:5678/webhook/poc-clean
+200
+```
+
+---
+
+## Hardening Verification
+
+### docker-compose.yml (redacted secrets)
+```yaml
+environment:
+  N8N_BLOCK_ENV_ACCESS_IN_NODE: 'true'
+  NODES_EXCLUDE: 'n8n-nodes-base.executeCommand,n8n-nodes-base.readWriteFile'
+  N8N_SECURE_COOKIE: 'true'
+```
+
+### Container running with hardening
+```
+$ docker ps --format 'table {{.Names}}\t{{.Status}}'
+NAMES          STATUS
+p38-n8n        Up 7 minutes
+p38-postgres   Up About an hour
+```

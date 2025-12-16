@@ -1,0 +1,25 @@
+{
+  "name": "POC Simple Active",
+  "active": true,
+  "versionId": "v1-simple",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "poc-simple",
+        "responseMode": "onReceived",
+        "responseData": "allEntries",
+        "options": {}
+      },
+      "id": "wh-simple",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [250, 300],
+      "webhookId": "poc-simple"
+    }
+  ],
+  "connections": {},
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

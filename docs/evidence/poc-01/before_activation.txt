@@ -1,0 +1,41 @@
+# POC-01 Evidence: Before Activation
+
+## Date: 2025-12-16T21:15:00Z
+## VM: p38-dev-vm-01 (136.111.39.139)
+
+---
+
+## DB State Before Fix
+
+### workflow_entity (active but no activeVersionId)
+```
+        id        |           name            | active | activeVersionId |              versionId               
+------------------+---------------------------+--------+-----------------+--------------------------------------
+ 6fFDwVjdwDzkkFLj | POC Final Test            | t      |                 | v1-final                            
+ csRNJIL5OuJDLSCU | POC Simple Webhook        | t      |                 | v1-simple                           
+ 7nYXJ6vmJrsC8do9 | POC Headless Webhook Test | t      | v1-published    | v1-published                        
+(3 rows)
+```
+
+### workflow_history (only one record)
+```
+  versionId   |    workflowId    | authors |         createdAt          
+--------------+------------------+---------+----------------------------
+ v1-published | 7nYXJ6vmJrsC8do9 | []      | 2025-12-16 20:41:37.237+00 
+(1 row)
+```
+
+### n8n Startup Log (only one activated)
+```
+Start Active Workflows:
+Activated workflow "POC Headless Webhook Test" (ID: 7nYXJ6vmJrsC8do9)
+```
+
+### Webhook Test (404 for workflows without activeVersionId)
+```
+$ curl http://localhost:5678/webhook/poc-final
+{"code":404,"message":"The requested webhook \"GET poc-final\" is not registered."}
+
+$ curl http://localhost:5678/webhook/poc-simple  
+{"code":404,"message":"The requested webhook \"GET poc-simple\" is not registered."}
+```
