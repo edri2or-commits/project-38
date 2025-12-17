@@ -311,3 +311,144 @@ docker compose --env-file C:\Users\edri2\p38-n8n.env down
 **Session Status:** ✅ COMPLETE  
 **Environment Status:** ✅ PRODUCTION READY (local)  
 **Next Session:** TBD based on user priority
+
+---
+
+# Session Update 2: Encryption Key Alignment
+
+**Date:** 2025-12-17  
+**Time:** 16:10-16:40 UTC (18:10-18:40 Israel)  
+**Duration:** 30 minutes  
+**Status:** ✅ RESOLVED
+
+---
+
+## Problem (Session 2)
+
+**Symptom:** N8N container restart loop after Session 1 fix
+
+**Logs:**
+```
+Error: Mismatching encryption keys. 
+The encryption key in /home/node/.n8n/config 
+does not match N8N_ENCRYPTION_KEY env var.
+```
+
+**Root Cause:**
+- Session 1: Updated env file with 64-char key from GCP
+- Volume config: Contains 32-char key from earlier deployment
+- N8N requires exact match → restart loop
+
+---
+
+## Investigation (SHA256 Only - Zero Secret Values)
+
+### GATE 1: Env File Key
+```
+SHA256:  02071F05C1AE59A6E325FE0F2A2248E650879A824D69F9DADB17853D7C668CCF
+Length:  64 chars
+Source:  C:\Users\edri2\p38-n8n.env
+```
+
+### GATE 2: Volume Config Key
+```
+SHA256:  D508AF92FBDD30E0AD90B93AFF1ED67ECBA48EC1A3611D8F68417950923DC54C
+Length:  32 chars
+Source:  Volume p38-n8n_n8n_data:/config
+```
+
+### GATE 3: Comparison
+```
+Match:   NO ❌
+Action:  Update env file to match volume config (preserve data)
+```
+
+---
+
+## Solution
+
+### Steps (Zero Data Loss)
+
+1. **Backup:**
+   ```powershell
+   Copy-Item C:\Users\edri2\p38-n8n.env C:\Users\edri2\p38-n8n.env.bak
+   ✅ Backup: 212 bytes
+   ```
+
+2. **Update Env File:**
+   - Changed N8N_ENCRYPTION_KEY to 32-char key (matches volume)
+   - ✅ SHA256 aligned: D508AF92...DC54C
+
+3. **Recreate Containers:**
+   ```bash
+   docker compose down
+   docker compose --env-file C:\Users\edri2\p38-n8n.env up -d --force-recreate
+   ```
+   - `restart` insufficient (does NOT reload env file)
+   - `--force-recreate` required (rebuilds containers with new env)
+   - Volumes preserved (no `-v` flag)
+
+---
+
+## Verification (RAW)
+
+### GATE 6: Container Status
+```
+p38-n8n       Up 2 minutes   127.0.0.1:5678->5678/tcp
+p38-postgres  Up 2 minutes   5432/tcp
+✅ No restart loop
+```
+
+### GATE 7A: Health Check
+```
+GET http://localhost:5678/healthz
+Status: 200
+Content: {"status":"ok"}
+```
+
+### GATE 7B: Readiness Check
+```
+GET http://localhost:5678/healthz/readiness
+Status: 200
+Content: {"status":"ok"}
+✅ DB connected + migrations complete
+```
+
+### GATE 7C: N8N Logs (Last 20 lines)
+```
+Finished migration BackfillMissingWorkflowHistoryRecords1765448186933
+n8n Task Broker ready on 127.0.0.1, port 5679
+Editor is now accessible via: http://136.111.39.139
+✅ NO encryption errors
+```
+
+---
+
+## Impact
+
+| Metric | Result |
+|--------|--------|
+| Data Loss | ✅ ZERO (volumes preserved) |
+| Key Alignment | ✅ ENV ↔️ Volume matched |
+| Health Status | ✅ 200 OK |
+| Readiness | ✅ 200 OK |
+| Restart Loop | ✅ Resolved |
+
+---
+
+## Technical Notes
+
+### Why `restart` Failed
+- `docker compose restart`: Keeps existing env vars
+- `docker compose up --force-recreate`: Reloads env file + rebuilds
+- Reference: Docker Compose CLI behavior
+
+### N8N Encryption Validation
+- On startup: Compares env var hash to volume config hash
+- Mismatch → refuses to start (prevents data loss)
+- Docs: https://docs.n8n.io/hosting/environment-variables/
+
+---
+
+**Session 2 Status:** ✅ COMPLETE  
+**Final State:** Local N8N fully operational (health + readiness verified)
