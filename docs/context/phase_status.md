@@ -1,6 +1,51 @@
 # Phase Status — Project 38 (V2)
 
-**Last Updated:** 2025-12-17 (Determinism Stabilization)
+**Last Updated:** 2025-12-17 (Local Environment Secret Fix)
+
+---
+
+## ✅ RESOLVED: Local Docker Compose Secret Issue (2025-12-17)
+
+### Status: STABLE
+**Session:** [2025-12-17 Local Secret Fix](../sessions/2025-12-17_local_secret_fix.md)
+
+**Problem:** Local Postgres in restart loop due to empty POSTGRES_PASSWORD
+- Docker Compose interpolation: `${POSTGRES_PASSWORD}` unresolved → `""` (empty string)
+- Postgres image requirement: POSTGRES_PASSWORD must be non-empty
+- Warning: `"The POSTGRES_PASSWORD variable is not set. Defaulting to a blank string"`
+- Error loop: Postgres exit 1 → Docker restart → repeat
+
+**Root Cause:** 
+- `docker-compose.yml` uses `${VAR}` interpolation
+- No `.env` file or `--env-file` provided
+- Variables defaulted to empty strings
+
+**Solution:** External env file with GCP secrets
+1. ✅ Created `C:\Users\edri2\p38-n8n.env` (OUTSIDE repo)
+2. ✅ Loaded secrets from GCP Secret Manager:
+   - `postgres-password` (44 chars)
+   - `n8n-encryption-key` (65 chars)
+   - `telegram-bot-token` (47 chars)
+3. ✅ Deployed with: `docker compose --env-file C:\Users\edri2\p38-n8n.env up -d`
+
+**Verification (RAW Gates):**
+- ✅ Gate A: No warnings in `docker compose config`
+- ✅ Gate B.1: `POSTGRES_PASSWORD` length = 44 chars (>2)
+- ✅ Gate B.2: Postgres logs show `"database system is ready to accept connections"`
+- ✅ Gate B.3: Both containers status = `Up` (not `Restarting`)
+
+**Impact:** 
+- Local n8n now accessible at http://localhost:5678
+- Postgres initialized successfully with production secrets
+- N8N_ENCRYPTION_KEY preserved (critical for existing volume data)
+
+**Documentation References:**
+- Compose interpolation: https://docs.docker.com/reference/compose-file/interpolation/
+- Postgres image: https://hub.docker.com/_/postgres
+- n8n encryption: https://docs.n8n.io/hosting/configuration/configuration-examples/encryption-key/
+- Compose --env-file: https://docs.docker.com/compose/how-tos/environment-variables/variable-interpolation/
+
+**Future Usage:** Always run with `--env-file C:\Users\edri2\p38-n8n.env`
 
 ---
 

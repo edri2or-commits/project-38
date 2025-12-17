@@ -1,142 +1,343 @@
-# N8N Deployment Files
+# N8N Local Deployment
 
-**Purpose:** Docker Compose configuration for N8N workflow engine + PostgreSQL database
-
-**Target:** DEV VM (p38-dev-vm-01)
-
-**Created:** 2025-12-16
+**Environment:** Local development (Windows)  
+**Status:** ✅ Operational  
+**Last Updated:** 2025-12-17
 
 ---
 
-## Files
-
-### docker-compose.yml
-Defines 2 services:
-- **postgres**: PostgreSQL 16 Alpine (database for N8N)
-- **n8n**: N8N workflow engine (latest)
-
-**Key Features:**
-- Port 5678 bound to localhost only (127.0.0.1)
-- Secrets passed as environment variables
-- Persistent volumes for data
-- Security hardening (node access blocked, dangerous nodes excluded)
-- Bridge network for inter-service communication
-- Image digests pinned for reproducibility
-
-### load-secrets.sh
-Runtime secret fetcher from GCP Secret Manager.
-
-**⚠️ WEBHOOK_URL Note:**
-Currently set to `http://136.111.39.139/` but port 5678 is localhost-only without reverse proxy.
-Webhooks work via Cloudflare Tunnel in POC-02 (see docs/phase-2/poc-02_telegram_webhook.md).
-For production, deploy proper ingress (nginx/Caddy) or update to tunnel URL.
-
-**Secrets Fetched:**
-1. n8n-encryption-key
-2. postgres-password
-3. telegram-bot-token
-
-**Usage:**
-```bash
-cd /home/edri2
-./load-secrets.sh
-```
-
-**Security:**
-- Fetches secrets at runtime (not stored in files)
-- Exports as environment variables for Docker Compose
-- Uses latest secret versions
-- No values exposed in logs
-
----
-
-## Deployment Instructions
+## Quick Start
 
 ### Prerequisites
-- ✅ VM: p38-dev-vm-01 running
-- ✅ Docker + Docker Compose installed on VM
-- ✅ Service Account: n8n-runtime attached to VM
-- ✅ Secrets: 3 secrets in GCP Secret Manager with IAM access
+- Docker Desktop installed and running
+- `C:\Users\edri2\p38-n8n.env` file with secrets (see Setup section)
 
-### Steps
-
-1. **Copy files to VM:**
-```powershell
-gcloud compute scp docker-compose.yml p38-dev-vm-01:/home/edri2/ --zone=us-central1-a --project=project-38-ai
-gcloud compute scp load-secrets.sh p38-dev-vm-01:/home/edri2/ --zone=us-central1-a --project=project-38-ai
-```
-
-2. **Make script executable:**
+### Start Services
 ```bash
-gcloud compute ssh p38-dev-vm-01 --zone=us-central1-a --project=project-38-ai --command="chmod +x /home/edri2/load-secrets.sh"
+cd C:\Users\edri2\project_38\deployment\n8n
+docker compose --env-file C:\Users\edri2\p38-n8n.env up -d
 ```
 
-3. **Deploy services:**
+### Access n8n
+Open browser: http://localhost:5678
+
+### Stop Services
 ```bash
-gcloud compute ssh p38-dev-vm-01 --zone=us-central1-a --project=project-38-ai --command="cd /home/edri2 && ./load-secrets.sh"
-```
-
-4. **Establish SSH port-forward:**
-```powershell
-gcloud compute ssh p38-dev-vm-01 --zone=us-central1-a --project=project-38-ai -- -L 5678:localhost:5678 -N
-```
-
-5. **Access N8N UI:**
-```
-http://localhost:5678
+docker compose --env-file C:\Users\edri2\p38-n8n.env down
+# Note: Does NOT delete volumes (data persists)
 ```
 
 ---
 
-## Verification
+## Setup
 
-### Container Status
+### 1. Environment File
+
+**Location:** `C:\Users\edri2\p38-n8n.env` (OUTSIDE repository)
+
+**Required variables:**
 ```bash
-docker ps --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}'
+POSTGRES_PASSWORD=<from-gcp-secret-manager>
+N8N_ENCRYPTION_KEY=<from-gcp-secret-manager>
+TELEGRAM_BOT_TOKEN=<from-gcp-secret-manager>
 ```
 
-Expected output:
-```
-NAME           IMAGE                STATUS              PORTS
-p38-n8n        n8nio/n8n:latest     Up X minutes        127.0.0.1:5678->5678/tcp
-p38-postgres   postgres:16-alpine   Up X minutes        5432/tcp
+**Create from GCP Secret Manager:**
+```powershell
+# Fetch secrets
+$pg = gcloud secrets versions access latest --secret=postgres-password --project=project-38-ai
+$n8n = gcloud secrets versions access latest --secret=n8n-encryption-key --project=project-38-ai
+$tg = gcloud secrets versions access latest --secret=telegram-bot-token --project=project-38-ai
+
+# Create env file
+@"
+POSTGRES_PASSWORD=$pg
+N8N_ENCRYPTION_KEY=$n8n
+TELEGRAM_BOT_TOKEN=$tg
+"@ | Out-File -FilePath C:\Users\edri2\p38-n8n.env -Encoding ASCII
 ```
 
-### Health Checks
-```bash
-# Postgres
-docker exec p38-postgres pg_isready -U n8n_user
-
-# N8N API
-curl -s http://localhost:5678/healthz
-```
-
-Expected: Both return success
+**⚠️ Security:**
+- ✅ File is OUTSIDE repository
+- ✅ Never commit to Git
+- ✅ Sourced from production secrets
 
 ---
 
-## Rollback
+## Architecture
 
+### Services
+
+**n8n (Workflow Engine)**
+- Image: `n8nio/n8n@sha256:e3a4256...` (version 2.0.2)
+- Container: `p38-n8n`
+- Port: `127.0.0.1:5678` (localhost only)
+- Volume: `p38-n8n_n8n_data` → `/home/node/.n8n`
+
+**PostgreSQL (Database)**
+- Image: `postgres@sha256:a507448...` (version 16.11)
+- Container: `p38-postgres`
+- Port: `5432` (internal only)
+- Volume: `p38-n8n_postgres_data` → `/var/lib/postgresql/data`
+- Database: `n8n`
+- User: `n8n`
+
+### Network
+- Name: `p38-n8n_project38-network`
+- Type: Bridge
+- Isolation: Internal communication only
+
+### Volumes (Persistent Data)
 ```bash
-# Stop and remove containers
+docker volume ls | grep p38-n8n
+p38-n8n_n8n_data         # n8n workflows, credentials, settings
+p38-n8n_postgres_data    # PostgreSQL database files
+```
+
+---
+
+## Compose File Details
+
+**File:** `docker-compose.yml`
+
+**Key Configuration:**
+```yaml
+name: p38-n8n  # Fixed project name (deterministic)
+
+services:
+  postgres:
+    image: postgres@sha256:...  # Pinned for stability
+    environment:
+      POSTGRES_DB: n8n
+      POSTGRES_USER: n8n
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}  # From env file
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  n8n:
+    image: n8nio/n8n@sha256:...  # Pinned for stability
+    depends_on:
+      - postgres
+    environment:
+      DB_TYPE: postgresdb
+      DB_POSTGRESDB_HOST: postgres
+      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY}  # From env file
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}  # From env file
+    ports:
+      - "127.0.0.1:5678:5678"  # Localhost only
+    volumes:
+      - n8n_data:/home/node/.n8n
+    restart: unless-stopped
+```
+
+**Design Decisions:**
+- ✅ Deterministic naming: `name: p38-n8n` prevents drift
+- ✅ Pinned images: SHA256 hashes for reproducibility
+- ✅ Localhost binding: Security (no external access)
+- ✅ No `version:` field: Modern Compose standard
+- ✅ Restart policy: Auto-recovery on failure
+
+---
+
+## Common Operations
+
+### View Logs
+```bash
+# All services
+docker compose --env-file C:\Users\edri2\p38-n8n.env logs -f
+
+# Specific service
+docker compose --env-file C:\Users\edri2\p38-n8n.env logs -f n8n
+docker compose --env-file C:\Users\edri2\p38-n8n.env logs -f postgres
+```
+
+### Check Status
+```bash
+docker compose --env-file C:\Users\edri2\p38-n8n.env ps
+```
+
+### Restart Services
+```bash
+docker compose --env-file C:\Users\edri2\p38-n8n.env restart
+```
+
+### Update Images
+```bash
+# Pull latest (respects pinned SHA256)
+docker compose --env-file C:\Users\edri2\p38-n8n.env pull
+
+# Recreate containers
+docker compose --env-file C:\Users\edri2\p38-n8n.env up -d
+```
+
+### Access PostgreSQL
+```bash
+docker exec -it p38-postgres psql -U n8n -d n8n
+```
+
+---
+
+## Troubleshooting
+
+### Issue: Postgres restart loop
+**Symptoms:**
+```bash
+docker compose ps
+# Shows: p38-postgres   Restarting (1) XX seconds ago
+```
+
+**Diagnosis:**
+```bash
+docker logs p38-postgres --tail 50
+# Look for: "Error: Database is uninitialized and superuser password is not specified"
+```
+
+**Cause:** `POSTGRES_PASSWORD` not set or empty
+
+**Fix:**
+1. Verify env file exists: `Test-Path C:\Users\edri2\p38-n8n.env`
+2. Check env file has `POSTGRES_PASSWORD=<non-empty-value>`
+3. Restart with env file: `docker compose --env-file ... up -d`
+
+**Verification:**
+```bash
+# Check password length (should be >2)
+docker exec p38-postgres printenv POSTGRES_PASSWORD | Measure-Object -Character
+
+# Check logs for success
+docker logs p38-postgres --tail 20
+# Should see: "database system is ready to accept connections"
+```
+
+### Issue: n8n cannot connect to database
+**Symptoms:**
+- n8n container running but workflows fail
+- Error logs mention database connection
+
+**Diagnosis:**
+```bash
+docker compose logs n8n | Select-String -Pattern "database|postgres"
+```
+
+**Possible causes:**
+1. Postgres container not running
+2. Wrong DB credentials
+3. Network issue
+
+**Fix:**
+```bash
+# Ensure postgres is up first
+docker compose ps postgres
+
+# Restart both services in correct order
 docker compose down
+docker compose --env-file C:\Users\edri2\p38-n8n.env up -d
+```
 
-# Remove volumes (if needed)
-docker volume rm edri2_postgres_data edri2_n8n_data
+### Issue: Warning about unset variables
+**Symptoms:**
+```
+level=warning msg="The POSTGRES_PASSWORD variable is not set. Defaulting to a blank string."
+```
 
-# Remove network
-docker network rm edri2_project38-network
+**Cause:** Running `docker compose` command WITHOUT `--env-file` flag
 
-# Remove files
-rm /home/edri2/docker-compose.yml /home/edri2/load-secrets.sh
+**Fix:** Always include `--env-file C:\Users\edri2\p38-n8n.env`
+
+---
+
+## Security
+
+### Port Binding
+- ✅ n8n bound to `127.0.0.1:5678` (localhost only)
+- ✅ Postgres internal only (no external port)
+- ✅ No services exposed to network
+
+### Secrets Management
+- ✅ Secrets in external file (not in repo)
+- ✅ Sourced from GCP Secret Manager
+- ✅ File permissions: User-only access
+- ❌ Do NOT commit `C:\Users\edri2\p38-n8n.env` to Git
+
+### Data Encryption
+- ✅ n8n encrypts credentials with `N8N_ENCRYPTION_KEY`
+- ⚠️ Key must remain stable (changing = data loss)
+- ✅ Key stored in GCP Secret Manager
+
+---
+
+## Data Persistence
+
+### Volumes
+Data persists across container restarts:
+- **n8n workflows:** Stored in `p38-n8n_n8n_data`
+- **Postgres data:** Stored in `p38-n8n_postgres_data`
+
+### Backup (Manual)
+```bash
+# Export n8n workflows
+docker exec p38-n8n n8n export:workflow --all --output=/tmp/workflows.json
+docker cp p38-n8n:/tmp/workflows.json ./backup/
+
+# Backup Postgres
+docker exec p38-postgres pg_dump -U n8n n8n > ./backup/db_backup.sql
+```
+
+### Restore (Manual)
+```bash
+# Import n8n workflows
+docker cp ./backup/workflows.json p38-n8n:/tmp/
+docker exec p38-n8n n8n import:workflow --input=/tmp/workflows.json
+
+# Restore Postgres
+docker exec -i p38-postgres psql -U n8n -d n8n < ./backup/db_backup.sql
+```
+
+### Complete Reset (⚠️ DATA LOSS)
+```bash
+# Stop and remove containers + volumes
+docker compose --env-file C:\Users\edri2\p38-n8n.env down -v
+
+# Restart fresh
+docker compose --env-file C:\Users\edri2\p38-n8n.env up -d
 ```
 
 ---
 
-## Evidence
+## References
 
-See full execution log: [docs/phase-2/slice-02a_execution_log.md](../../docs/phase-2/slice-02a_execution_log.md)
+### Documentation
+- **Docker Compose:** https://docs.docker.com/compose/
+- **Compose env files:** https://docs.docker.com/compose/how-tos/environment-variables/variable-interpolation/
+- **n8n Documentation:** https://docs.n8n.io/
+- **n8n Docker:** https://docs.n8n.io/hosting/installation/docker/
+- **Postgres Image:** https://hub.docker.com/_/postgres
 
-**Execution Date:** 2025-12-16  
-**Duration:** ~72 minutes  
-**Result:** ✅ SUCCESS
+### Session Logs
+- **Setup session:** [docs/sessions/2025-12-17_local_secret_fix.md](../../docs/sessions/2025-12-17_local_secret_fix.md)
+- **Determinism fix:** [docs/sessions/2025-12-17_determinism_stabilization.md](../../docs/sessions/2025-12-17_determinism_stabilization.md)
+
+### GCP Resources
+- **Project:** `project-38-ai`
+- **Secrets:**
+  - `postgres-password`
+  - `n8n-encryption-key`
+  - `telegram-bot-token`
+
+---
+
+## Support
+
+**Issues or questions?**
+1. Check logs: `docker compose logs -f`
+2. Verify status: `docker compose ps`
+3. Review session logs: `docs/sessions/`
+4. Consult troubleshooting section above
+
+**Environment healthy when:**
+- ✅ Both containers show `Up` status
+- ✅ n8n accessible at http://localhost:5678
+- ✅ No restart loops in `docker compose ps`
+- ✅ Logs show "ready to accept connections" (postgres)
+- ✅ No warnings about unset variables
