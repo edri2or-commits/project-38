@@ -54,7 +54,7 @@ nohup ./cloudflared tunnel --url http://localhost:5678 > tunnel.log 2>&1 &
 | v2 (Respond node) | `responseMode="lastNode"` incompatible | Changed to `responseMode="onReceived"` |
 | v3 (FINAL) | — | Working: webhook + dedup code |
 
-**Final Workflow:** `telegram_v2.json`
+**Final Workflow:** `telegram_v2_workflow.json` (repo: `docs/phase-2/artifacts/`)
 - Workflow ID: `fyYPOaF7uoCMsa2U`
 - Path: `/webhook/telegram-v2`
 - Nodes: Webhook → Code (dedup + log)
@@ -195,7 +195,7 @@ HTTP Code: 200
 
 | File | Location | Purpose |
 |------|----------|---------|
-| telegram_v2.json | VM + Local | Final workflow |
+| telegram_v2_workflow.json | docs/phase-2/artifacts/ | Final workflow (in repo) |
 | activate_v2.sh | VM | Activation script |
 | tg_setup.sh | VM | Webhook registration |
 | poc02_proof.sh | VM | Final proof collection |

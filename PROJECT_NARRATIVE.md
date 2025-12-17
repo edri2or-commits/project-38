@@ -296,7 +296,7 @@ V1 Broken Flow:
   Deploy → Manual n8n UI login → Import credentials → Hope nothing breaks
 
 V2 Fixed Flow:
-  Deploy → fetch_secrets.sh (GCP Secret Manager)
+  Deploy → deployment/scripts/fetch_secrets.sh (GCP Secret Manager)
          → .env file created
          → Docker Compose mounts .env as env vars
          → n8n reads credentials from ENV (not DB)
@@ -304,7 +304,7 @@ V2 Fixed Flow:
 ```
 
 **V2 Implementation:**
-- `fetch_secrets.sh` script with proper error handling
+- `deployment/scripts/fetch_secrets.sh` script with proper error handling
 - Secrets injected at container startup (no UI import)
 - Health gate: Deployment fails if credentials not accessible
 - Evidence: [Slice 2A Runbook](docs/phase-2/slice-02a_runbook.md) documents full flow

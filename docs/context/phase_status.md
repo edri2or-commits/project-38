@@ -12,32 +12,35 @@
 
 ---
 
-## 🚨 CRITICAL FINDING (2025-12-17)
+## ✅ RESOLVED: Secret Re-deployment Complete (2025-12-17)
 
-### Placeholder Secrets Discovered
-**Session:** [2025-12-17 Drift Verification](../sessions/2025-12-17_drift_verification.md)
+### Status: PRODUCTION READY
+**Sessions:** 
+- [Drift Verification](../sessions/2025-12-17_drift_verification.md)
+- [Re-deployment Summary](../sessions/2025-12-17_redeploy_summary.md)
 
-**Finding:** All 3 secrets in VM containers are backslash literals (`\`):
-- `POSTGRES_PASSWORD=\` (2 bytes)
-- `N8N_ENCRYPTION_KEY=\` (2 bytes)
-- `N8N_TELEGRAM_BOT_TOKEN=\` (2 bytes)
+**Finding (Resolved):** All 3 secrets were backslash literals (`\`) → Now real GCP secrets
 
-**Root Cause:**
-- Deployment: `docker compose up -d` bypassed `./load-secrets.sh`
-- VM file `/home/edri2/docker-compose.yml` contains hardcoded `\` values
+**Resolution Actions:**
+1. ✅ Created `load-secrets-v2.sh` with validation gates
+2. ✅ Fixed `docker-compose.yml` on VM (${VAR} syntax)
+3. ✅ Deployed with real secrets from GCP Secret Manager
+4. ✅ All 4 RAW proofs passed
 
-**Impact:**
-- ⚠️ N8N encryption weak (key=`\`)
-- ⚠️ Telegram bot token invalid for sendMessage
-- ✅ Postgres functional (password=`\` is valid, SCRAM-SHA-256 authenticated)
+**Current Secret Status:**
+- ✅ `POSTGRES_PASSWORD`: 45 bytes (real GCP secret)
+- ✅ `N8N_ENCRYPTION_KEY`: 65 bytes (real GCP secret)
+- ✅ `TELEGRAM_BOT_TOKEN`: 47 bytes (real GCP secret)
 
-**Safety Gates (All Passed):**
-- ✅ 0 credentials in database → Safe to re-deploy
-- ✅ 6 simple workflows (webhook POCs, no credentials)
-- ✅ No data loss risk
+**Data Impact:**
+- ⚠️ 6 POC workflows lost (acceptable - no production data)
+- ✅ 0 credentials preserved (nothing encrypted)
+- ✅ Fresh DB with production-grade secrets
 
-**Recommended Action:**
-Execute `./load-secrets.sh` on VM to inject real GCP secrets
+**Validation:**
+- ✅ N8N healthcheck: `{"status":"ok"}`
+- ✅ Postgres authentication: Works without prompt
+- ✅ No encryption errors in logs
 
 ---
 
@@ -132,4 +135,4 @@ Execute `./load-secrets.sh` on VM to inject real GCP secrets
 
 ---
 
-**Current Status:** POC-02 PASS ✅ | Ready for POC-03 or Kernel deployment
+**Current Status:** POC-02 PASS ✅ | Secrets PRODUCTION READY ✅ | Ready for POC-03 or Kernel deployment

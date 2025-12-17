@@ -361,7 +361,7 @@ fi
 **Timestamp:** 2025-12-15 03:01:00
 **Command:**
 ```bash
-gcloud compute scp C:\Users\edri2\project_38\fetch_secrets.sh \
+gcloud compute scp C:\Users\edri2\project_38\deployment\scripts\fetch_secrets.sh \
   project38-vm:/tmp/fetch_secrets.sh \
   --zone=us-central1-a \
   --strict-host-key-checking=no
@@ -450,7 +450,7 @@ gcloud compute instances create project38-vm \
   --image-family=ubuntu-2204-lts \
   --image-project=ubuntu-os-cloud \
   --scopes=cloud-platform \
-  --metadata-from-file startup-script=C:\Users\edri2\project_38\startup.sh \
+  --metadata-from-file startup-script=C:\Users\edri2\project_38\deployment\archive\startup.sh \
   --address=project38-ip
 ```
 **Result:** ✅ SUCCESS
@@ -472,7 +472,7 @@ project38-vm  us-central1-a  e2-medium                  10.128.0.4   34.170.133.
 **Re-upload Script:**
 **Command:**
 ```bash
-gcloud compute scp C:\Users\edri2\project_38\fetch_secrets.sh \
+gcloud compute scp C:\Users\edri2\project_38\deployment\scripts\fetch_secrets.sh \
   project38-vm:/tmp/fetch_secrets.sh \
   --zone=us-central1-a \
   --strict-host-key-checking=no

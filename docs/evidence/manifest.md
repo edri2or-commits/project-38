@@ -40,7 +40,7 @@
 | 01 | Firewall rules verification | phase-2/slice-01/firewall_verify.txt | 2025-12-15 10:30:00 | E3F8E79486E8AA98D5BB51F2ED1E94A39E0D347BF7F1437E97CD0C8962B02138 | 3905 | gcloud compute firewall-rules list output |
 | 01 | IAM validation | phase-2/slice-01/iam_verify.txt | 2025-12-15 10:32:00 | 34676ADAA4D9447A94B3F6B9EC2E5F23DEAE00F766B66B75B159D3E0B4090B20 | 5644 | Service account impersonation test results |
 | POC-02 | Proof output | phase-2/poc-02/poc02_proof_output.txt | 2025-12-16 22:00:34 | 3179F21438F716A8C682DA07064BBB09391B298AD1DC5E99BF3D548C5BF999A6 | 1358 | Final proof: getWebhookInfo, executions, live test |
-| POC-02 | Workflow JSON | phase-2/poc-02/telegram_v2_workflow.json | 2025-12-16 21:44:00 | CC897FDA4FC066628BD99092123D40478C5C97160392D3093E309D3E969DF99E | 1577 | Final Telegram webhook workflow with dedup |
+| POC-02 | Workflow JSON | **IN_REPO:** docs/phase-2/artifacts/telegram_v2_workflow.json | 2025-12-16 21:44:00 | CC897FDA4FC066628BD99092123D40478C5C97160392D3093E309D3E969DF99E | 1577 | Final Telegram webhook workflow with dedup (stored in repo, not external store) |
 
 **Note:** Evidence store created 2025-12-16. All artifacts include SHA256 hashes for integrity verification. All secrets redacted.
 
@@ -65,7 +65,7 @@ C:\Users\edri2\project_38__evidence_store\
 │   │   └── screenshots/               # Optional: GCP Console screenshots
 │   ├── poc-02/
 │   │   ├── poc02_proof_output.txt     # Final proof: getWebhookInfo, executions
-│   │   └── telegram_v2_workflow.json  # Telegram webhook workflow with dedup
+│   │   └── [MOVED TO REPO] telegram_v2_workflow.json → docs/phase-2/artifacts/
 │   ├── slice-02a/
 │   │   ├── compose_up_output.txt      # Docker Compose up full output
 │   │   ├── n8n_initial_logs.txt       # N8N container startup logs

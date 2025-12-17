@@ -135,7 +135,7 @@ gcloud secrets add-iam-policy-binding project38/n8n-encryption-key \
   --role="roles/secretmanager.secretAccessor"
 
 # 3. Deploy fetch script to VM
-scp fetch_secrets.sh project38-vm:/opt/project38/
+scp deployment/scripts/fetch_secrets.sh project38-vm:/opt/project38/
 ssh project38-vm "chmod +x /opt/project38/fetch_secrets.sh"
 ```
 

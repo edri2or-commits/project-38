@@ -8,6 +8,23 @@
 
 ## Sessions Index
 
+### 2025-12-17 — Secret Re-deployment (FINAL)
+**File:** `2025-12-17_redeploy_summary.md`
+
+**Summary:** Re-deployed VM with real GCP secrets, validated all gates, resolved encryption key conflict
+
+**Key Actions:**
+- Created load-secrets-v2.sh with validation gates (length checks, non-empty, rotation logic)
+- Fixed docker-compose.yml on VM (replaced hardcoded `\` with `${VAR}` syntax)
+- Deployed with real secrets (POSTGRES=45B, N8N_KEY=65B, TG_TOKEN=47B)
+- Validated 4 RAW proofs: lengths >2, DB connection works, 0 credentials, no encrypt errors
+
+**Data Impact:** 6 POC workflows lost (acceptable - fresh DB required for encryption key change)
+
+**Result:** ✅ PRODUCTION READY - All secrets validated, N8N healthy, Postgres authenticated
+
+---
+
 ### 2025-12-17 — Drift Verification & Secret Investigation
 **File:** `2025-12-17_drift_verification.md`
 
@@ -24,6 +41,8 @@
 
 **Impact:** 🚨 Identified security issue (placeholder secrets), ✅ Proven safe for re-deployment
 
+**Status:** ✅ Resolved (see 2025-12-17_redeploy_summary.md)
+
 ---
 
 ### 2025-12-16 — GitHub Repository Fixes
@@ -32,8 +51,8 @@
 **Summary:** Fixed 4 critical issues in GitHub repo + documented GitHub autonomy
 
 **Key Actions:**
-- Fixed fetch_secrets.sh scope violation (CRITICAL for Slice 2A)
-- Removed startup.sh apt-get upgrade (timeout prevention)
+- Fixed deployment/scripts/fetch_secrets.sh scope violation (CRITICAL for Slice 2A)
+- Removed deployment/archive/startup.sh apt-get upgrade (timeout prevention)
 - Synced README.md and phase_status.md with actual state
 - Added Rule 12 (GitHub Autonomy) to operating_rules.md
 
@@ -49,61 +68,38 @@
 **Summary:** VM baseline infrastructure deployment
 
 **Key Actions:**
-- Created VM: p38-dev-vm-01 (e2-medium, us-central1-a)
-- Static IP: 136.111.39.139
-- Installed Docker v29.1.3 + Compose v5.0.0
-- Attached n8n-runtime SA
-- Verified secret access
+- Created VM: p38-dev-vm-01 (e2-medium, 136.111.39.139)
+- Installed Docker 29.1.3 + Docker Compose 5.0.0
+- Reserved static IP
+- Verified VM accessibility via SSH
 
-**Duration:** 4 minutes 30 seconds
-
-**Status:** ✅ COMPLETE
+**Status:** ✅ DONE
 
 ---
 
-## Session Log Format
+## Session Brief Template
 
-Each session log must include:
+When creating new session briefs, include:
 
-### Required Sections
-1. **Session Overview** - Objective, outcome, key achievement
-2. **Actions Performed** - Detailed list of what was done
-3. **Impact Analysis** - What changed and why it matters
-4. **Validation** - What was verified
-5. **Lessons Learned** - Insights for future sessions
-6. **Next Steps** - Immediate, pending, deferred
-7. **Files Modified** - Local and GitHub changes
-8. **Security Audit** - Secret exposure, least privilege, approval checks
-
-### When to Create
-- ✅ After every GitHub push
-- ✅ After major architectural decisions
-- ✅ After slice executions (cross-reference)
-- ✅ After significant documentation updates
-
-### Naming Convention
-```
-YYYY-MM-DD_session_brief.md
-```
+1. **Date & Duration:** YYYY-MM-DD, approximate time
+2. **Session Type:** Investigation / Deployment / Troubleshooting / Documentation
+3. **GitHub Impact:** Commit hash (if pushed) or "No commits"
+4. **Objective:** What was the goal?
+5. **Outcome:** What was achieved?
+6. **Key Actions:** Bullet list of main activities
+7. **Lessons Learned:** What to remember for next time
+8. **Next Steps:** What's pending or recommended
 
 ---
 
-## Cross-References
+## Audit Notes
 
-### Slice Execution Logs
-- Slice 1: `../phase-2/slice-01_execution_log.md`
-- Slice 2A: `../phase-2/slice-02a_execution_log.md` (pending)
-- Slice 2B/3: `../phase-2/slice-02b_execution_log.md` (pending)
-
-### Evidence Store
-- Evidence manifests: `../evidence/manifest.md`
-- Evidence files: `C:\Users\edri2\project_38__evidence_store\`
-
-### Core Documentation
-- Operating rules: `../context/operating_rules.md`
-- Traceability matrix: `../traceability_matrix.md`
-- Project facts: `../context/project_facts.md`
+- **All sessions with GitHub pushes MUST have a session brief**
+- Session briefs are created in `docs/sessions/YYYY-MM-DD_*.md`
+- This index is updated after each session
+- Cross-reference slice execution logs when relevant
 
 ---
 
-**Last Updated:** 2025-12-16
+**Last Updated:** 2025-12-17  
+**Total Sessions:** 4
