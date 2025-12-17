@@ -1,6 +1,30 @@
 # Phase Status — Project 38 (V2)
 
-**Last Updated:** 2025-12-17 (Drift Verification + Secret Investigation)
+**Last Updated:** 2025-12-17 (Determinism Stabilization)
+
+---
+
+## ✅ RESOLVED: Deterministic Docker Compose Names (2025-12-17)
+
+### Status: STABLE
+**Commit:** `6f983ec`
+
+**Problem:** Docker Compose project names were directory-based, causing prefix drift
+- Legacy: `n8n_*` resources
+- Inconsistent naming based on working directory
+
+**Solution:** Enforced deterministic project naming
+1. ✅ Added `name: p38-n8n` to docker-compose.yml
+2. ✅ Removed obsolete `version:` field
+3. ✅ Added `.gitattributes` for LF normalization
+
+**Verification (RAW Gates):**
+- ✅ Compose Project: `p38-n8n` (fixed, not directory-based)
+- ✅ Volumes: `p38-n8n_n8n_data`, `p38-n8n_postgres_data`
+- ✅ Network: `p38-n8n_project38-network`
+- ✅ **Zero prefix drift:** No `edri2_` or random names
+
+**Impact:** All Docker resources now consistently use `p38-n8n_` prefix
 
 ---
 
