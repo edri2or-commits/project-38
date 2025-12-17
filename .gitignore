@@ -111,3 +111,9 @@ Desktop.ini
 /poc_final.json
 /simple_webhook.json
 /test_webhook.json
+
+# SQL Helper Scripts (Root Only)
+# Added: 2025-12-17 - Third cleanup batch (SQL helpers)
+/create_history.sql
+/fix_publish.sql
+/fix_workflow.sql
