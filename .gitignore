@@ -95,3 +95,19 @@ Desktop.ini
 /tg_*.sh
 /tg_*.json
 /telegram_*.json
+
+# Legacy POC Scripts (Root Only)
+# Added: 2025-12-17 - Second cleanup of POC helper scripts
+/activate_poc.sh
+/check_db.sh
+/check_history.sh
+/check_history.sql
+/check_versions.sh
+/check_workflow.sql
+/final_poc.sh
+/fix_activation.sh
+/full_poc.sh
+/run_poc.sh
+/poc_final.json
+/simple_webhook.json
+/test_webhook.json
