@@ -75,9 +75,9 @@
 
 ## Current Phase: PHASE 2 - WORKLOAD DEPLOYMENT
 
-**Status:** Slice 2A ✅ | POC-01 ✅ | POC-02 ✅ | 🚨 Secret Issue Identified
+**Status:** Slice 2A ✅ | POC-01 ✅ | POC-02 ✅ | POC-03 ⏸️ (Activation Required)
 
-**Mode:** DEV environment operational, **pending re-deployment with real secrets**
+**Mode:** DEV environment operational
 
 ---
 
@@ -149,13 +149,47 @@
 - Webhook Path: `/webhook/telegram-v2`
 - Workflow ID: `fyYPOaF7uoCMsa2U`
 
+#### POC-03: Full Conversation Flow (⏸️ PAUSED — 2025-12-17)
+**Session:** [2025-12-17 POC-03 Issues](../sessions/2025-12-17_poc03_issues.md)
+
+**Status:** Workflows imported but activation blocked
+
+**Created:**
+- Mock Kernel workflow (ID: mKmLYWfXGkAayBnf)
+- Conversation POC-03 workflow (ID: AIAz8XxmeI9mie9D)
+
+**Blockers:**
+1. Webhooks not registered (workflows imported but not properly activated)
+2. Missing Telegram credentials (hardcoded ID doesn't exist)
+3. Requires manual UI activation OR activation script
+
+**Next Actions:**
+- Create Telegram credential in n8n
+- Activate workflows via UI toggle
+- OR: Create activation script for webhook workflows
+
 ---
 
 ## 📋 NEXT
 
-### POC-03: Full Conversation Flow (PROPOSED)
-- Telegram → n8n → Kernel → n8n → Telegram response
-- Requires: Kernel deployment OR mock endpoint
+### POC-03: Full Conversation Flow (BLOCKED — Activation Required)
+**Status:** Workflows imported, awaiting proper activation
+
+**Options:**
+1. **Manual UI Activation** (Fast, ~10 min):
+   - Create Telegram credential in n8n UI
+   - Activate Mock Kernel workflow
+   - Edit + Activate Conversation POC-03 workflow
+   
+2. **Programmatic Activation** (Reproducible, ~30 min):
+   - Create activation script for webhook workflows
+   - Query existing Telegram credentials from POC-02
+   - Update workflow JSON with real credential IDs
+   - Activate via script
+
+**Blockers:**
+- Webhook registration requires proper activation (not just DB flag)
+- Missing Telegram credentials in imported workflow
 
 ### Slice 2B/3: Kernel Deployment
 **Status:** DEFERRED pending SA architecture decision

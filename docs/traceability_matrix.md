@@ -31,6 +31,7 @@
 | **Workload Deployment (Slice 2A - N8N)** | ✅ DONE | Slice 2A | [Execution Log](phase-2/slice-02a_execution_log.md) | Completed 2025-12-16 • N8N + Postgres deployed (72 min) |
 | **POC-01: Headless Activation + Hardening** | ✅ PASS | Phase 2 | [POC-01 Doc](phase-2/poc-01_headless_hardening.md) | Completed 2025-12-16 • Headless workflow activation verified |
 | **POC-02: Telegram Webhook Integration** | ✅ PASS | Phase 2 | [POC-02 Doc](phase-2/poc-02_telegram_webhook.md) | Completed 2025-12-16 • Telegram webhook + dedup verified |
+| **POC-03: Full Conversation Flow** | ⏸️ BLOCKED | Phase 2 | [POC-03 Issues](sessions/2025-12-17_poc03_issues.md) | Workflows imported, activation blocked (credentials + webhook registration) |
 | **Workload Deployment (Slice 2B/3 - Kernel)** | ⏸️ DEFERRED | Slice 2B/3 | Pending | Kernel service - SA architecture TBD |
 | **Testing & Validation (Slice 3)** | 📋 NEXT | Slice 3 | Pending | DEV environment validation |
 | **PROD Mirror (Slice 4)** | ⏸️ DEFERRED | Slice 4 | Pending | After DEV approval |

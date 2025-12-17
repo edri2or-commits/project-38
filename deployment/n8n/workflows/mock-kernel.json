@@ -1,0 +1,51 @@
+{
+  "name": "Mock Kernel",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "mock-kernel",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "mock-webhook-node",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "webhookId": "mock-kernel-webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [\n  {\n    json: {\n      response: \"שלום! אני Mock Kernel. קיבלתי את ההודעה שלך.\",\n      status: \"success\",\n      model: \"mock-v1\",\n      timestamp: new Date().toISOString()\n    }\n  }\n];"
+      },
+      "id": "mock-response-node",
+      "name": "Mock Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Mock Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 0,
+  "updatedAt": "2025-12-17T18:40:00.000Z"
+}
