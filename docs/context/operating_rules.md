@@ -1,6 +1,6 @@
 # Operating Rules — Project 38 (V2)
 
-**Last Updated:** 2025-12-16  
+**Last Updated:** 2025-12-18  
 **Scope:** Anti-chaos rules for Project 38 operations
 
 ---
@@ -625,6 +625,87 @@ docs/sessions/
 
 ---
 
+## Rule 13: Gate IDs Naming Convention
+
+**Purpose:** Prevent ambiguity when referencing verification gates across different contexts.
+
+### Format
+```
+<namespace>-Gate-<number>
+```
+
+### Namespace Examples
+
+**POC-level Gates:**
+- `POC-01-Gate-1` - Headless activation verification
+- `POC-02-Gate-3` - Telegram webhook response validation
+- `POC-03-Gate-2` - Mock Kernel webhook test
+
+**Document/Issue-level Gates:**
+- `DS-Gate-3` - Deterministic Secret (networks verified)
+- `LCS-Gate-A` - Local Compose Secret (no warnings)
+- `LCS-Gate-B.2` - Postgres logs validation
+
+**Phase-level Gates:**
+- `Phase1-Gate-A` - VM vs Cloud Run decision
+- `Slice01-Gate-1` - VM creation success
+
+### Usage Rules
+
+**✅ CORRECT:**
+```
+POC-03-Gate-2 PASS - Mock Kernel responded with HTTP 200
+```
+
+**❌ WRONG:**
+```
+Gate 2 PASS  (missing namespace - ambiguous)
+```
+
+### When Multiple Gates Exist
+
+If you encounter "Gate 3" without namespace:
+1. **STOP** before claiming which gate
+2. **Provide 2 concrete examples** from SSOT:
+   - Example: "DS-Gate-3 = networks, POC-02-Gate-3 = webhook"
+3. **Ask for mapping confirmation** if uncertain:
+   ```
+   רציתי לאמת: האם זה POC-03-Gate-3 או LCS-Gate-3?
+   ```
+
+### Grep for Mapping (If Needed)
+
+**PowerShell:**
+```powershell
+Get-ChildItem -Path docs -Recurse -Filter *.md | 
+  Select-String "Gate.*3" | 
+  Select-Object -First 10 -Property @{Name='Location';Expression={"$($_.Path):$($_.LineNumber)"}}
+```
+
+**Do NOT run `grep docs/**/*.md`** (globstar issues + prints content)
+
+### Documentation Standard
+
+**When documenting new gates:**
+1. Always include namespace in initial definition
+2. Use consistent format: `NAMESPACE-Gate-N`
+3. Add to section header or summary
+
+**Example:**
+```markdown
+## POC-03 Verification Gates
+
+### POC-03-Gate-1: Webhook Configuration
+- Check: httpMethod, path, responseMode
+- Expected: POST, mock-kernel, lastNode
+
+### POC-03-Gate-2: Webhook Response
+- Check: HTTP status + JSON structure
+- Expected: 200 OK + {"response":...,"status":"success"}
+```
+
+---
+
 ## Summary: Top 10 Don'ts
 
 1. ❌ Execute new build/deploy without explicit user instruction (Slice 1 DONE, Slice 2A awaiting approval)
@@ -637,3 +718,4 @@ docs/sessions/
 8. ❌ Deploy to PROD before DEV validation
 9. ❌ Use Drive as SSOT (repo is truth now)
 10. ❌ Assume facts not in documentation
+11. ❌ Use "Gate N" without namespace (use "NAMESPACE-Gate-N")
