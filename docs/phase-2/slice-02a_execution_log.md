@@ -658,4 +658,72 @@ The docker-compose.yml shown in Step 1 represents the initial template. The **ac
 
 ---
 
+## Post-Execution Discovery (2025-12-17)
+
+### 🚨 Placeholder Secrets Found in Containers
+
+**Session:** [2025-12-17 Drift Verification](../sessions/2025-12-17_drift_verification.md)
+
+**Discovery:** All 3 runtime secrets in containers are backslash literals (`\`), not real GCP secrets:
+
+| Secret | Expected Source | Actual Container Value |
+|--------|----------------|----------------------|
+| POSTGRES_PASSWORD | GCP: postgres-password | `\` (2 bytes: 0x5c + newline) |
+| N8N_ENCRYPTION_KEY | GCP: n8n-encryption-key | `\` (2 bytes: 0x5c + newline) |
+| N8N_TELEGRAM_BOT_TOKEN | GCP: telegram-bot-token | `\` (2 bytes: 0x5c + newline) |
+
+**Evidence:**
+```bash
+docker exec p38-postgres printenv POSTGRES_PASSWORD | wc -c  # Output: 2
+docker exec p38-postgres printenv POSTGRES_PASSWORD | head -c 1 | od -An -tx1  # Output: 5c (backslash)
+docker inspect p38-postgres --format='{{range .Config.Env}}{{println .}}{{end}}' | grep POSTGRES_PASSWORD
+# Output: POSTGRES_PASSWORD=\
+```
+
+**Root Cause:**
+- VM file `/home/edri2/docker-compose.yml` contains hardcoded placeholder values
+- Deployment executed: `docker compose up -d` (direct)
+- Script `/home/edri2/load-secrets.sh` exists but was **NOT executed**
+
+**Why Services Work Despite Placeholder Secrets:**
+
+1. **Postgres (WORKS):**
+   - Password `\` was set during container initialization
+   - Stored as SCRAM-SHA-256 hash in pg_authid
+   - N8N connects from 172.18.0.3 → 172.18.0.2
+   - pg_hba.conf line 27: `host all all all scram-sha-256` (first match)
+   - Authentication succeeds: client password `\` matches stored hash
+   - Verified: `echo "SELECT rolname, rolpassword IS NULL FROM pg_authid WHERE rolname='n8n';" → n8n | f (HAS PASSWORD)`
+
+2. **N8N (DEGRADED):**
+   - Encryption key `\` is cryptographically weak
+   - 0 credentials stored → no immediate risk
+   - Healthcheck passing: `curl http://localhost:5678/healthz → {"status":"ok"}`
+
+3. **Telegram Bot (NON-FUNCTIONAL):**
+   - Token `\` is invalid for Telegram API
+   - POC-02 succeeded because webhook registration used: `$(gcloud secrets versions access latest --secret=telegram-bot-token)`
+   - Container env token NOT used during POC-02
+
+**Safety Validation (All Gates Passed):**
+- ✅ **0 credentials** in database (credentials_entity, shared_credentials, variables)
+- ✅ **6 simple workflows** (webhook POCs, no credential nodes)
+- ✅ **No encryption errors** in logs
+- ✅ **Safe to re-deploy** with real secrets (no data loss risk)
+
+**Impact Assessment:**
+- ⚠️ **Security:** N8N encryption key weak, Telegram bot inactive
+- ✅ **Functionality:** Postgres works, N8N UI/webhooks operational
+- ✅ **Data Integrity:** No credentials to lose, simple workflows only
+
+**Recommended Remediation:**
+1. Execute `/home/edri2/load-secrets.sh` on VM
+2. Verify secret injection: `docker exec p38-postgres printenv POSTGRES_PASSWORD | wc -c` (should be >20)
+3. Restart containers automatically (load-secrets.sh includes `docker compose up -d`)
+4. Update runbook to mandate `./load-secrets.sh` in deployment flow
+
+**Status:** Awaiting user approval for secret injection
+
+---
+
 **End of Slice 2A Execution Log**

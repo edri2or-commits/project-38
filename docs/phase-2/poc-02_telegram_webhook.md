@@ -233,4 +233,73 @@ All acceptance criteria met:
 
 ---
 
+## Post-POC Findings (2025-12-17)
+
+### Secret Investigation: Placeholder Values Discovered
+
+**Discovery Date:** 2025-12-17  
+**Context:** Drift verification session (see `docs/sessions/2025-12-17_drift_verification.md`)
+
+**Finding:** All 3 secrets in VM containers are backslash literals (`\`), not real GCP secrets:
+
+| Secret | Container Value | Expected Source |
+|--------|----------------|-----------------|
+| `POSTGRES_PASSWORD` | `\` (2 bytes) | GCP Secret: postgres-password |
+| `N8N_ENCRYPTION_KEY` | `\` (2 bytes) | GCP Secret: n8n-encryption-key |
+| `N8N_TELEGRAM_BOT_TOKEN` | `\` (2 bytes) | GCP Secret: telegram-bot-token |
+
+**Evidence:**
+```bash
+docker exec p38-postgres printenv POSTGRES_PASSWORD | wc -c  # 2
+docker exec p38-n8n printenv N8N_ENCRYPTION_KEY | wc -c      # 2
+docker exec p38-n8n printenv N8N_TELEGRAM_BOT_TOKEN | wc -c  # 2
+
+# First byte (hex)
+docker exec p38-postgres printenv POSTGRES_PASSWORD | head -c 1 | od -An -tx1
+# Output: 5c (backslash)
+```
+
+**Root Cause:**
+- Deployment: `docker compose up -d` run directly (bypassed `./load-secrets.sh`)
+- File: `/home/edri2/docker-compose.yml` contains hardcoded `POSTGRES_PASSWORD: \`
+- Script: `/home/edri2/load-secrets.sh` exists but was NOT executed
+
+**Impact on POC-02:**
+- ✅ **Webhook registration worked:** Used actual bot token fetched during POC (via gcloud command)
+- ⚠️ **Container env invalid:** `N8N_TELEGRAM_BOT_TOKEN=\` inside container is placeholder
+- ⚠️ **Echo bot blocked:** Cannot implement sendMessage with invalid token in container
+
+**Why POC-02 Succeeded Despite Invalid Container Token:**
+- Telegram webhook registration used: `BOT_TOKEN=$(gcloud secrets versions access latest --secret=telegram-bot-token)`
+- This fetched the **real** token directly from GCP Secret Manager
+- Container token (`\`) was never used during POC-02 execution
+
+**Postgres Authentication Mystery - Resolved:**
+- **Question:** How does Postgres work with `POSTGRES_PASSWORD=\`?
+- **Answer:** Password `\` is the **correct password** (not trust mode, not passwordless)
+- **Mechanism:**
+  1. Postgres container init used `POSTGRES_PASSWORD=\` to create user `n8n`
+  2. Password `\` was hashed with SCRAM-SHA-256 and stored in pg_authid
+  3. N8N connects from 172.18.0.3 → 172.18.0.2
+  4. pg_hba.conf line 27: `host all all all scram-sha-256` (first matching rule)
+  5. Authentication succeeds: client password `\` matches stored hash
+
+**Safety Gates (All Passed):**
+- ✅ **0 credentials** in database (credentials_entity, shared_credentials, variables)
+- ✅ **0 encryption errors** in logs
+- ✅ **6 simple workflows** (webhook POCs, no credential nodes)
+- ✅ **Safe to re-deploy** with real secrets (no data loss risk)
+
+**Recommendation:**
+Re-deploy with real secrets via `./load-secrets.sh` to fix:
+1. N8N encryption key (currently `\` - weak)
+2. Telegram bot token (currently `\` - invalid for sendMessage)
+3. Postgres password (currently `\` - functional but placeholder)
+
+**Reference:**
+- [Session Brief: 2025-12-17 Drift Verification](../sessions/2025-12-17_drift_verification.md)
+- [Commit 9dcd9bb: Drift Closure](https://github.com/edri2or-commits/project-38/commit/9dcd9bbcd8b263efe5ff30f4e94b95e7a6162d55)
+
+---
+
 **Evidence Store:** `C:\Users\edri2\project_38__evidence_store\phase-2\poc-02\`

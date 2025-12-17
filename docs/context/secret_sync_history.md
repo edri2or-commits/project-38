@@ -163,6 +163,63 @@ gcloud iam service-accounts list --project=<project-id>
 | 2024-12-15 | Initial sync verification | SYNC_OK | 7 secrets × 2 projects verified |
 | 2024-12-15 | IAM configuration verified | IAM_OK | 3 SA per project + least privilege |
 | 2024-12-15 | Final approval | FINAL_OK | No changes needed, ready for use |
+| 2025-12-17 | VM deployment audit | 🚨 DRIFT | Found: Containers using placeholder `\` instead of GCP secrets |
+| 2025-12-17 | Secret injection investigation | PENDING | load-secrets.sh exists but not executed; awaiting re-deployment |
+
+---
+
+## 🚨 Current Issue: Placeholder Secrets on VM (2025-12-17)
+
+### Discovery
+**Session:** [2025-12-17 Drift Verification](../sessions/2025-12-17_drift_verification.md)
+
+**Finding:** VM containers (p38-postgres, p38-n8n) running with backslash literals instead of real secrets:
+
+| Secret in GCP | Container Value | Expected Value Source |
+|---------------|----------------|----------------------|
+| postgres-password | `\` (2 bytes) | GCP Secret Manager |
+| n8n-encryption-key | `\` (2 bytes) | GCP Secret Manager |
+| telegram-bot-token | `\` (2 bytes) | GCP Secret Manager |
+
+**Evidence:**
+```bash
+# All secrets are 2-byte backslash literals
+docker exec p38-postgres printenv POSTGRES_PASSWORD | wc -c  # 2
+docker exec p38-n8n printenv N8N_ENCRYPTION_KEY | wc -c      # 2
+docker exec p38-n8n printenv N8N_TELEGRAM_BOT_TOKEN | wc -c  # 2
+
+# First byte is 0x5c (backslash)
+docker exec p38-postgres printenv POSTGRES_PASSWORD | head -c 1 | od -An -tx1
+# Output: 5c
+```
+
+**Root Cause:**
+- VM deployment: `docker compose up -d` run directly (bypassed `./load-secrets.sh`)
+- File `/home/edri2/docker-compose.yml` contains hardcoded placeholder values:
+  ```yaml
+  POSTGRES_PASSWORD: \
+  N8N_ENCRYPTION_KEY: \
+  N8N_TELEGRAM_BOT_TOKEN: \
+  ```
+- Script `/home/edri2/load-secrets.sh` exists but was NOT executed
+
+**Impact:**
+- ⚠️ **N8N encryption weak:** Encryption key is `\` (not cryptographically secure)
+- ⚠️ **Telegram bot inactive:** Token `\` is invalid for Telegram API
+- ✅ **Postgres functional:** Password `\` works (SCRAM-SHA-256 authenticated)
+
+**Safety Validation:**
+- ✅ **0 credentials** in database → Safe to re-deploy without data loss
+- ✅ **6 simple workflows** (webhook POCs, no credential nodes)
+- ✅ **No encryption errors** in logs
+
+**Resolution Plan:**
+1. Execute `/home/edri2/load-secrets.sh` on VM
+2. Verify secret lengths: `docker exec p38-postgres printenv POSTGRES_PASSWORD | wc -c` (should be >20)
+3. Restart containers with real secrets
+4. Update deployment runbook to enforce `./load-secrets.sh` step
+
+**Status:** Awaiting user approval for re-deployment
 
 ---
 

@@ -1,14 +1,43 @@
 # Phase Status — Project 38 (V2)
 
-**Last Updated:** 2025-12-16 (POC-02 Complete)
+**Last Updated:** 2025-12-17 (Drift Verification + Secret Investigation)
 
 ---
 
 ## Current Phase: PHASE 2 - WORKLOAD DEPLOYMENT
 
-**Status:** Slice 2A ✅ | POC-01 ✅ | POC-02 ✅
+**Status:** Slice 2A ✅ | POC-01 ✅ | POC-02 ✅ | 🚨 Secret Issue Identified
 
-**Mode:** DEV environment operational, Telegram webhook verified
+**Mode:** DEV environment operational, **pending re-deployment with real secrets**
+
+---
+
+## 🚨 CRITICAL FINDING (2025-12-17)
+
+### Placeholder Secrets Discovered
+**Session:** [2025-12-17 Drift Verification](../sessions/2025-12-17_drift_verification.md)
+
+**Finding:** All 3 secrets in VM containers are backslash literals (`\`):
+- `POSTGRES_PASSWORD=\` (2 bytes)
+- `N8N_ENCRYPTION_KEY=\` (2 bytes)
+- `N8N_TELEGRAM_BOT_TOKEN=\` (2 bytes)
+
+**Root Cause:**
+- Deployment: `docker compose up -d` bypassed `./load-secrets.sh`
+- VM file `/home/edri2/docker-compose.yml` contains hardcoded `\` values
+
+**Impact:**
+- ⚠️ N8N encryption weak (key=`\`)
+- ⚠️ Telegram bot token invalid for sendMessage
+- ✅ Postgres functional (password=`\` is valid, SCRAM-SHA-256 authenticated)
+
+**Safety Gates (All Passed):**
+- ✅ 0 credentials in database → Safe to re-deploy
+- ✅ 6 simple workflows (webhook POCs, no credentials)
+- ✅ No data loss risk
+
+**Recommended Action:**
+Execute `./load-secrets.sh` on VM to inject real GCP secrets
 
 ---
 
