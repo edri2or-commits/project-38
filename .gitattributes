@@ -1,0 +1,33 @@
+# Line Ending Normalization
+# Ref: https://docs.github.com/articles/dealing-with-line-endings
+
+# Auto-detect text files and normalize line endings to LF
+* text=auto
+
+# Shell scripts must use LF (critical for Linux/Mac compatibility)
+*.sh text eol=lf
+
+# Batch/PowerShell scripts use CRLF (Windows-specific)
+*.bat text eol=crlf
+*.ps1 text eol=crlf
+
+# Documentation uses LF (cross-platform consistency)
+*.md text eol=lf
+*.txt text eol=lf
+
+# Configuration files use LF
+*.yml text eol=lf
+*.yaml text eol=lf
+*.json text eol=lf
+*.toml text eol=lf
+
+# Python uses LF
+*.py text eol=lf
+
+# Images and binaries (no line ending conversion)
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary

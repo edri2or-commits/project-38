@@ -1,4 +1,4 @@
-version: '3.8'
+name: p38-n8n
 
 services:
   postgres:
