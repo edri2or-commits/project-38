@@ -1,0 +1,22 @@
+name: Ops Console
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  issues: write
+
+jobs:
+  gate:
+    name: Gate on /approve
+    runs-on: ubuntu-latest
+    if: |
+      !github.event.issue.pull_request &&
+      startsWith(github.event.comment.body, '/approve')
+    steps:
+      - name: Acknowledge approval gate
+        run: |
+          echo "::notice::Approval gate triggered by ${{ github.actor }}"
+          echo "PR: ${{ github.event.issue.number }}"
+          echo "Comment: ${{ github.event.comment.id }}"
