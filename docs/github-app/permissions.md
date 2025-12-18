@@ -212,11 +212,11 @@
 | Scope | Single repo (project-38) | All repos user has access to |
 | Attribution | Shows as "bot" | Shows as user |
 | Permissions | Granular (4 specific) | Broad (repo = 8+ permissions) |
-| Expiration | Private key doesn't expire | Token has configurable expiration |
+| Expiration | Private key doesn't expire | Varies by token type & org policy |
 | Revocation | Uninstall app | Delete token |
 | Rate Limit | 5,000 req/hour per installation | 5,000 req/hour per user |
 | Audit | Clearly identified in logs | Mixed with user actions |
-| Token Lifetime | Installation access token expires after 1 hour | Configurable expiration |
+| Token Lifetime | Installation access token expires after 1 hour | Varies by token type & org policy |
 
 **Winner:** GitHub App (better security, attribution, and scoping)
 
