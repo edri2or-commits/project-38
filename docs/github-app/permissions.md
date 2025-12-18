@@ -216,6 +216,7 @@
 | Revocation | Uninstall app | Delete token |
 | Rate Limit | 5,000 req/hour per installation | 5,000 req/hour per user |
 | Audit | Clearly identified in logs | Mixed with user actions |
+| Token Lifetime | Installation access token expires after 1 hour | Configured expiration (30-90 days typical) |
 
 **Winner:** GitHub App (better security, attribution, and scoping)
 
