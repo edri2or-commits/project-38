@@ -108,8 +108,13 @@
 - ✅ Metadata: Read-only (automatic)
 
 **Webhook Configuration:**
-- Status: Disabled (not needed for current use case)
-- Rationale: No stable HTTPS endpoint available yet
+- Status: ✅ ACTIVE (configured and verified in production)
+- URL: https://github-webhook-receiver-u7gbgdjoja-uc.a.run.app/webhook
+- Features: Signature verification (HMAC-SHA256), Firestore idempotency, Fast-ACK (202)
+- TTL: ACTIVE (documents expire after 24h; deletion not immediate, typically within 24h after expiration)
+- Note: TTL does not delete subcollections
+- Deployment: Cloud Run (us-central1), revision github-webhook-receiver-00006-n54
+- Ref: PR #15, Issue #14
 
 **Installation Scope:**
 - Account: edri2or-commits only
