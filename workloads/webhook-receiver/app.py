@@ -2,7 +2,10 @@ import os
 import hmac
 import hashlib
 import logging
+from datetime import datetime, timedelta
 from flask import Flask, request, abort
+from google.cloud import firestore
+from google.api_core.exceptions import AlreadyExists
 
 app = Flask(__name__)
 
@@ -13,6 +16,9 @@ logging.basicConfig(
     datefmt='%Y-%m-%dT%H:%M:%S'
 )
 logger = logging.getLogger(__name__)
+
+# Initialize Firestore client
+db = firestore.Client()
 
 # Load webhook secret from environment
 # In production, this should be injected from Secret Manager
@@ -56,8 +62,33 @@ def verify_signature(payload_body, signature_header):
 
 @app.route('/webhook', methods=['POST'])
 def webhook():
-    # Extract delivery ID for logging (GitHub sends X-GitHub-Delivery header)
-    delivery_id = request.headers.get('X-GitHub-Delivery', 'unknown')
+    # Extract delivery ID for logging and idempotency
+    delivery_id = request.headers.get('X-GitHub-Delivery')
+    
+    if not delivery_id:
+        logger.warning("POST /webhook rejected: missing X-GitHub-Delivery header")
+        abort(400)
+    
+    # Idempotency check: Atomic create in Firestore
+    # Uses document create() which fails if document already exists
+    doc_ref = db.collection('webhook_deliveries').document(delivery_id)
+    
+    try:
+        # Atomic operation: create document with TTL field
+        # If document exists, this will raise AlreadyExists
+        doc_ref.create({
+            'timestamp': firestore.SERVER_TIMESTAMP,
+            'status': 'seen',
+            'expireAt': datetime.utcnow() + timedelta(days=1)
+        })
+        
+        # Document created successfully - first time seeing this delivery
+        logger.info(f"POST /webhook processing (delivery_id: {delivery_id})")
+        
+    except AlreadyExists:
+        # Document already exists - duplicate delivery
+        logger.info(f"POST /webhook duplicate skipped (delivery_id: {delivery_id})")
+        return 'Accepted', 202
     
     # Get signature header
     signature_header = request.headers.get('X-Hub-Signature-256')
@@ -68,8 +99,8 @@ def webhook():
         logger.warning(f"POST /webhook rejected: invalid signature (delivery_id: {delivery_id})")
         abort(401)  # Unauthorized
     
-    # Log successful verification (no headers/body, only delivery_id)
-    logger.info(f"POST /webhook received (delivery_id: {delivery_id})")
+    # Signature verified - webhook accepted
+    logger.info(f"POST /webhook accepted (delivery_id: {delivery_id})")
     
     return '', 200
 
