@@ -62,7 +62,16 @@ def verify_signature(payload_body, signature_header):
 
 @app.route('/webhook', methods=['POST'])
 def webhook():
-    # Extract delivery ID for logging and idempotency
+    # SECURITY: Verify signature FIRST before any processing
+    # Per GitHub docs: "validate the webhook signature before processing the delivery further"
+    # This prevents attackers from poisoning the delivery_id namespace
+    signature_header = request.headers.get('X-Hub-Signature-256')
+    
+    if not verify_signature(request.data, signature_header):
+        logger.warning("POST /webhook rejected: invalid or missing signature")
+        abort(401)  # Unauthorized
+    
+    # Signature verified - safe to proceed with idempotency check
     delivery_id = request.headers.get('X-GitHub-Delivery')
     
     if not delivery_id:
@@ -90,19 +99,8 @@ def webhook():
         logger.info(f"POST /webhook duplicate skipped (delivery_id: {delivery_id})")
         return 'Accepted', 202
     
-    # Get signature header
-    signature_header = request.headers.get('X-Hub-Signature-256')
-    
-    # Verify signature
-    if not verify_signature(request.data, signature_header):
-        # Log rejection (no headers/body, only delivery_id)
-        logger.warning(f"POST /webhook rejected: invalid signature (delivery_id: {delivery_id})")
-        abort(401)  # Unauthorized
-    
-    # Signature verified - webhook accepted
-    logger.info(f"POST /webhook accepted (delivery_id: {delivery_id})")
-    
-    return '', 200
+    # New delivery accepted
+    return 'Accepted', 202
 
 @app.route('/health', methods=['GET'])
 def health():
