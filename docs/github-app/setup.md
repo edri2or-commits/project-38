@@ -16,10 +16,12 @@
 
 ```yaml
 App Name: project-38-scribe
+App ID: 2497877
+Client ID: Iv23liR3bOoRpgq05oe9
 Homepage URL: https://github.com/edri2or-commits/project-38
 
 Webhook:
-  Active: ☐ Disabled (not needed)
+  Active: ☐ Disabled (until HTTPS endpoint exists)
   URL: (empty)
   Secret: (empty)
 
@@ -91,7 +93,7 @@ Install Location:
 **Result:**
 - App installed on: `edri2or-commits/project-38`
 - Installation ID: (assigned by GitHub)
-- Permissions active: Actions R/W, Contents R/W, Workflows R/W
+- Permissions: UNKNOWN (awaiting UI verification - see https://github.com/settings/apps/project-38-scribe)
 
 **Verification:**
 - Repository settings → Integrations → GitHub Apps
