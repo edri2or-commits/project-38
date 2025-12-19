@@ -2,7 +2,10 @@ import os
 import hmac
 import hashlib
 import logging
+from datetime import datetime, timedelta
 from flask import Flask, request, abort
+from google.cloud import firestore
+from google.cloud.exceptions import Conflict
 
 app = Flask(__name__)
 
@@ -13,6 +16,9 @@ logging.basicConfig(
     datefmt='%Y-%m-%dT%H:%M:%S'
 )
 logger = logging.getLogger(__name__)
+
+# Initialize Firestore client
+db = firestore.Client()
 
 # Load webhook secret from environment
 # In production, this should be injected from Secret Manager
@@ -56,22 +62,45 @@ def verify_signature(payload_body, signature_header):
 
 @app.route('/webhook', methods=['POST'])
 def webhook():
-    # Extract delivery ID for logging (GitHub sends X-GitHub-Delivery header)
-    delivery_id = request.headers.get('X-GitHub-Delivery', 'unknown')
-    
-    # Get signature header
+    # SECURITY: Verify signature FIRST before any processing
+    # Per GitHub docs: "validate the webhook signature before processing the delivery further"
+    # This prevents attackers from poisoning the delivery_id namespace
     signature_header = request.headers.get('X-Hub-Signature-256')
     
-    # Verify signature
     if not verify_signature(request.data, signature_header):
-        # Log rejection (no headers/body, only delivery_id)
-        logger.warning(f"POST /webhook rejected: invalid signature (delivery_id: {delivery_id})")
+        logger.warning("POST /webhook rejected: invalid or missing signature")
         abort(401)  # Unauthorized
     
-    # Log successful verification (no headers/body, only delivery_id)
-    logger.info(f"POST /webhook received (delivery_id: {delivery_id})")
+    # Signature verified - safe to proceed with idempotency check
+    delivery_id = request.headers.get('X-GitHub-Delivery')
     
-    return '', 200
+    if not delivery_id:
+        logger.warning("POST /webhook rejected: missing X-GitHub-Delivery header")
+        abort(400)
+    
+    # Idempotency check: Atomic create in Firestore
+    # Uses document create() which fails if document already exists
+    doc_ref = db.collection('webhook_deliveries').document(delivery_id)
+    
+    try:
+        # Atomic operation: create document with TTL field
+        # If document exists, this will raise Conflict
+        doc_ref.create({
+            'timestamp': firestore.SERVER_TIMESTAMP,
+            'status': 'seen',
+            'expireAt': datetime.utcnow() + timedelta(days=1)
+        })
+        
+        # Document created successfully - first time seeing this delivery
+        logger.info(f"POST /webhook processing (delivery_id: {delivery_id})")
+        
+    except Conflict:
+        # Document already exists - duplicate delivery
+        logger.info(f"POST /webhook duplicate skipped (delivery_id: {delivery_id})")
+        return 'Accepted', 202
+    
+    # New delivery accepted
+    return 'Accepted', 202
 
 @app.route('/health', methods=['GET'])
 def health():
