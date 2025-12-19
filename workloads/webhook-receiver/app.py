@@ -5,7 +5,7 @@ import logging
 from datetime import datetime, timedelta
 from flask import Flask, request, abort
 from google.cloud import firestore
-from google.api_core.exceptions import AlreadyExists
+from google.cloud.exceptions import Conflict
 
 app = Flask(__name__)
 
@@ -75,7 +75,7 @@ def webhook():
     
     try:
         # Atomic operation: create document with TTL field
-        # If document exists, this will raise AlreadyExists
+        # If document exists, this will raise Conflict
         doc_ref.create({
             'timestamp': firestore.SERVER_TIMESTAMP,
             'status': 'seen',
@@ -85,7 +85,7 @@ def webhook():
         # Document created successfully - first time seeing this delivery
         logger.info(f"POST /webhook processing (delivery_id: {delivery_id})")
         
-    except AlreadyExists:
+    except Conflict:
         # Document already exists - duplicate delivery
         logger.info(f"POST /webhook duplicate skipped (delivery_id: {delivery_id})")
         return 'Accepted', 202
