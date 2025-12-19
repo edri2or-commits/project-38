@@ -28,12 +28,16 @@
 - Metadata: Read (automatic)
 
 ### Webhook Status
-- **Active:** ✓ Enabled (checkbox checked in UI)
-- **URL:** Empty (not configured)
-- **Secret:** Empty (not configured)
-- **Delivery:** None (GitHub does not deliver events without URL)
+- **Active:** ✅ ACTIVE (configured and verified in production)
+- **URL:** https://github-webhook-receiver-u7gbgdjoja-uc.a.run.app/webhook
+- **Secret:** ✅ Configured (stored in Secret Manager: github-webhook-secret)
+- **Delivery:** ✅ Verified (ping + redeliver tests passed)
 
-**Rationale:** No stable HTTPS endpoint exists. Webhook remains enabled for future use but URL not set until production endpoint deployed.
+**Features:**
+- Signature verification (HMAC-SHA256) before processing
+- Idempotency via Firestore (X-GitHub-Delivery tracking)
+- Fast-ACK: 202 responses in <10s (48-213ms measured)
+- TTL: Documents expire after 24h (ACTIVE)
 
 ### Authentication
 - **Method:** Private key (RSA)
@@ -85,12 +89,15 @@ Permissions: issues:write (least privilege)
 
 ### HTTPS Endpoints
 
-**Available:**
-- Telegram: Temporary Cloudflare Tunnel (https://count-allowing-licensing-demands.trycloudflare.com)
+**Production (Cloud Run):**
+- GitHub Webhook: https://github-webhook-receiver-u7gbgdjoja-uc.a.run.app/webhook
+  - Service: github-webhook-receiver
+  - Revision: github-webhook-receiver-00006-n54
+  - Region: us-central1
+  - Status: ✅ ACTIVE (signature-verified, idempotent)
 
-**Not Available:**
-- GitHub App webhooks: No stable HTTPS endpoint
-- Production domain: DEFERRED
+**Development:**
+- Telegram: Temporary Cloudflare Tunnel (https://count-allowing-licensing-demands.trycloudflare.com)
 
 ---
 
@@ -120,18 +127,18 @@ Permissions: issues:write (least privilege)
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
-| 2025-12-18 | GitHub App created without webhook URL | No stable HTTPS endpoint; webhook can be added later |
-| 2025-12-19 | Webhook remains enabled but unconfigured | Ready for future use when endpoint deployed |
+| 2025-12-18 | GitHub App created with webhook enabled | Cloud Run provides stable HTTPS endpoint |
+| 2025-12-19 | Webhook configured and verified in production | PR #15: signature-first + idempotency + TTL |
 | 2025-12-19 | IssueOps workflow: Issues only (not PRs) | Clear separation of concerns; least privilege |
 
 ---
 
 ## Known Gaps
 
-1. **GitHub App Webhooks:** Enabled but URL not set (waiting for stable endpoint)
-2. **POC-03 Activation:** Workflows imported but not properly activated
-3. **Telegram Credentials:** Need to be created in n8n for POC-03
-4. **Production HTTPS:** No permanent domain or SSL certificate
+1. **POC-03 Activation:** Workflows imported but not properly activated
+2. **Telegram Credentials:** Need to be created in n8n for POC-03
+3. **Production HTTPS:** No permanent domain or SSL certificate (Cloud Run provides stable HTTPS)
+4. **GitHub Webhook Infrastructure:** Firestore + Cloud Run operational; future: add processing logic beyond ACK
 
 ---
 

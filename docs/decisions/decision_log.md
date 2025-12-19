@@ -5,6 +5,45 @@ Each entry includes: Date, Decision, Context, Rationale, Impact
 
 ---
 
+## 2025-12-19: GitHub App Webhook — Production Deployment (Cloud Run)
+
+**Context:**
+- GitHub App "project-38-scribe" created with App ID 2497877
+- Cloud Run service `github-webhook-receiver` deployed (us-central1)
+- Firestore database provisioned for idempotency tracking
+- Webhook URL: https://github-webhook-receiver-u7gbgdjoja-uc.a.run.app/webhook
+
+**Decision:**
+Configure webhook URL with signature verification and idempotency (PR #15).
+
+**Rationale:**
+1. **Stable HTTPS Endpoint:** Cloud Run provides production-grade HTTPS with auto-scaling
+2. **Security-First:** HMAC-SHA256 signature verification before processing (prevents delivery_id poisoning)
+3. **Idempotency:** Firestore-based duplicate detection using X-GitHub-Delivery GUID
+4. **Fast-ACK:** Return 202 immediately (48-213ms measured, well under 10s requirement)
+5. **TTL:** Documents expire after 24h (automatic cleanup)
+
+**Impact:**
+- GitHub webhook events delivered automatically to Cloud Run
+- Signature verification prevents unauthorized requests (401)
+- Duplicate deliveries skipped gracefully (202 + log "duplicate skipped")
+- Firestore costs: minimal (free tier covers expected load)
+
+**Implementation:**
+- PR #15: signature-first flow + Firestore idempotency + TTL
+- Main SHA: ee50ab7f690e1b443a811046ceee4ba8bad4f0e1
+- Revision: github-webhook-receiver-00006-n54
+- All production gates passed (401/202/duplicate/logs/<10s)
+
+**References:**
+- Issue #14: https://github.com/edri2or-commits/project-38/issues/14
+- PR #15: https://github.com/edri2or-commits/project-38/pull/15
+
+**Supersedes:**
+- Previous decision (2025-12-19): "Keep Disabled Until Stable HTTPS" → now has stable endpoint
+
+---
+
 ## 2025-12-19: GitHub App Webhook — Keep Disabled Until Stable HTTPS
 
 **Context:**
