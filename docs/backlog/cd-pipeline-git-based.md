@@ -45,7 +45,7 @@ Cloud Build Trigger
 Build Container Image
   ↓ tag with $SHORT_SHA
 Artifact Registry
-  ↓ gcr.io/.../app:$SHORT_SHA
+  ↓ <REGION>-docker.pkg.dev/<PROJECT>/<REPO>/<IMAGE>:$SHORT_SHA
 Cloud Run Deploy
   ↓ metadata includes commit SHA
 Production (with full audit trail)
@@ -78,9 +78,9 @@ steps:
     args:
       - 'build'
       - '-t'
-      - 'gcr.io/$PROJECT_ID/$_SERVICE_NAME:$SHORT_SHA'
+      - 'us-central1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/$_SERVICE_NAME:$SHORT_SHA'
       - '-t'
-      - 'gcr.io/$PROJECT_ID/$_SERVICE_NAME:latest'
+      - 'us-central1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/$_SERVICE_NAME:latest'
       - '.'
     dir: 'workloads/webhook-receiver'
 
@@ -89,7 +89,7 @@ steps:
     args:
       - 'push'
       - '--all-tags'
-      - 'gcr.io/$PROJECT_ID/$_SERVICE_NAME'
+      - 'us-central1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/$_SERVICE_NAME'
 
   # Deploy to Cloud Run
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
@@ -98,7 +98,7 @@ steps:
       - 'run'
       - 'deploy'
       - '$_SERVICE_NAME'
-      - '--image=gcr.io/$PROJECT_ID/$_SERVICE_NAME:$SHORT_SHA'
+      - '--image=us-central1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/$_SERVICE_NAME:$SHORT_SHA'
       - '--region=$_REGION'
       - '--platform=managed'
       - '--project=$PROJECT_ID'
@@ -108,14 +108,21 @@ substitutions:
   _REGION: us-central1
 
 images:
-  - 'gcr.io/$PROJECT_ID/$_SERVICE_NAME:$SHORT_SHA'
-  - 'gcr.io/$PROJECT_ID/$_SERVICE_NAME:latest'
+  - 'us-central1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/$_SERVICE_NAME:$SHORT_SHA'
+  - 'us-central1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/$_SERVICE_NAME:latest'
 
 options:
   logging: CLOUD_LOGGING_ONLY
 ```
 
 **Reference:** [Cloud Build: Substitute variable values](https://docs.cloud.google.com/build/docs/configuring-builds/substitute-variable-values)
+
+> **Note:** `gcr.io/...` pushes work only if you use **Artifact Registry `gcr.io` repositories**. Container Registry itself no longer accepts image writes (since 2025-03-18). Otherwise, push to Artifact Registry using `<REGION>-docker.pkg.dev/<PROJECT>/<REPO>/<IMAGE>:<TAG>`.
+>
+> **References:**
+> - [Transition from Container Registry](https://docs.cloud.google.com/artifact-registry/docs/transition/transition-from-gcr)
+> - [Prepare for Container Registry shutdown](https://docs.cloud.google.com/artifact-registry/docs/transition/prepare-gcr-shutdown)
+> - [Artifact Registry gcr.io repositories](https://docs.cloud.google.com/artifact-registry/docs/transition/gcr-repositories)
 
 #### Step 3: Grant IAM Permissions
 
@@ -145,7 +152,7 @@ gcloud iam service-accounts add-iam-policy-binding github-webhook-receiver-sa@pr
 
 ### Audit Trail
 - ✅ Git commit SHA in build metadata
-- ✅ Image tags traceable to commits (`gcr.io/.../app:abc1234`)
+- ✅ Image tags traceable to commits (e.g., `us-central1-docker.pkg.dev/.../app:abc1234`)
 - ✅ Deployment history linked to Git history
 
 ### Automation
@@ -201,6 +208,9 @@ gcloud iam service-accounts add-iam-policy-binding github-webhook-receiver-sa@pr
 - [Cloud Build: Substitute variable values](https://docs.cloud.google.com/build/docs/configuring-builds/substitute-variable-values)
 - [Cloud Run: Deploying from source code](https://docs.cloud.google.com/run/docs/deploying-source-code)
 - [Artifact Registry: Integrate with Cloud Run](https://docs.cloud.google.com/artifact-registry/docs/integrate-cloud-run)
+- [Transition from Container Registry](https://docs.cloud.google.com/artifact-registry/docs/transition/transition-from-gcr)
+- [Prepare for Container Registry shutdown](https://docs.cloud.google.com/artifact-registry/docs/transition/prepare-gcr-shutdown)
+- [Artifact Registry gcr.io repositories](https://docs.cloud.google.com/artifact-registry/docs/transition/gcr-repositories)
 
 ---
 
