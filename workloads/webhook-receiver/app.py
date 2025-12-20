@@ -6,7 +6,7 @@ import time
 import jwt
 import requests
 from datetime import datetime, timedelta
-from flask import Flask, request, abort
+from flask import Flask, request, abort, jsonify
 from google.cloud import firestore
 from google.cloud.exceptions import Conflict
 from google.cloud import secretmanager
@@ -87,35 +87,123 @@ def get_installation_access_token(installation_id):
         logger.error(f"Failed to get installation token: {e}")
         raise
 
-def post_ack_comment(installation_id, repo_full_name, issue_number, comment_id, delivery_id):
-    """Post ACK comment to the issue."""
-    try:
-        # Get installation access token
-        token = get_installation_access_token(installation_id)
+def parse_command(comment_body):
+    """
+    Parse issue comment for commands.
+    
+    Returns:
+        tuple: (command, args) or (None, None)
         
-        # Prepare comment body
-        comment_body = f"ACK: received comment_id={comment_id} delivery_id={delivery_id}"
+    Examples:
+        "/label bug" → ("label", ["bug"])
+        "/assign @user" → ("assign", ["user"])
+        "regular comment" → (None, None)
+    """
+    if not comment_body.strip().startswith('/'):
+        return None, None
+    
+    parts = comment_body.strip().split(maxsplit=1)
+    command = parts[0][1:]  # Remove leading '/'
+    args = parts[1].split() if len(parts) > 1 else []
+    
+    # Remove @ prefix from usernames
+    if command == 'assign':
+        args = [arg.lstrip('@') for arg in args]
+    
+    return command, args
+
+def post_comment(installation_token, repo_full_name, issue_number, comment_body):
+    """
+    Post a comment to a GitHub issue.
+    
+    Args:
+        installation_token: GitHub installation access token
+        repo_full_name: Repository in format "owner/repo"
+        issue_number: Issue number
+        comment_body: Comment text to post
         
-        # Post comment
-        headers = {
-            'Accept': 'application/vnd.github+json',
-            'Authorization': f'Bearer {token}',
-            'X-GitHub-Api-Version': '2022-11-28'
-        }
+    Returns:
+        dict: GitHub API response with comment details
         
-        url = f'https://api.github.com/repos/{repo_full_name}/issues/{issue_number}/comments'
-        payload = {'body': comment_body}
+    Raises:
+        requests.HTTPError: If API request fails
+    """
+    headers = {
+        'Accept': 'application/vnd.github+json',
+        'Authorization': f'Bearer {installation_token}',
+        'X-GitHub-Api-Version': '2022-11-28'
+    }
+    
+    url = f'https://api.github.com/repos/{repo_full_name}/issues/{issue_number}/comments'
+    payload = {'body': comment_body}
+    
+    response = requests.post(url, headers=headers, json=payload, timeout=5)
+    response.raise_for_status()
+    
+    return response.json()
+
+def add_label(installation_token, repo_full_name, issue_number, labels):
+    """
+    Add labels to issue via GitHub REST API.
+    POST /repos/{owner}/{repo}/issues/{issue_number}/labels
+    
+    Docs: https://docs.github.com/en/rest/issues/labels#add-labels-to-an-issue
+    
+    Args:
+        installation_token: GitHub installation access token
+        repo_full_name: Repository in format "owner/repo"
+        issue_number: Issue number
+        labels: List of label names to add
         
-        response = requests.post(url, headers=headers, json=payload, timeout=2)
-        response.raise_for_status()
+    Returns:
+        list: Updated list of all labels on the issue
         
-        ack_comment_id = response.json()['id']
-        logger.info(f"ACK posted: comment_id={ack_comment_id} for issue #{issue_number}")
-        return True
+    Raises:
+        requests.HTTPError: If API request fails
+    """
+    url = f"https://api.github.com/repos/{repo_full_name}/issues/{issue_number}/labels"
+    headers = {
+        'Authorization': f'Bearer {installation_token}',
+        'Accept': 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2022-11-28'
+    }
+    payload = {"labels": labels}
+    
+    response = requests.post(url, headers=headers, json=payload, timeout=5)
+    response.raise_for_status()
+    return response.json()
+
+def assign_users(installation_token, repo_full_name, issue_number, assignees):
+    """
+    Assign users to issue via GitHub REST API.
+    POST /repos/{owner}/{repo}/issues/{issue_number}/assignees
+    
+    Max 10 assignees. Users without push access may be ignored.
+    Docs: https://docs.github.com/en/rest/issues/assignees#add-assignees-to-an-issue
+    
+    Args:
+        installation_token: GitHub installation access token
+        repo_full_name: Repository in format "owner/repo"
+        issue_number: Issue number
+        assignees: List of usernames to assign (max 10)
         
-    except Exception as e:
-        logger.error(f"Failed to post ACK comment: {e}")
-        return False
+    Returns:
+        dict: Updated issue object
+        
+    Raises:
+        requests.HTTPError: If API request fails
+    """
+    url = f"https://api.github.com/repos/{repo_full_name}/issues/{issue_number}/assignees"
+    headers = {
+        'Authorization': f'Bearer {installation_token}',
+        'Accept': 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2022-11-28'
+    }
+    payload = {"assignees": assignees[:10]}  # Max 10
+    
+    response = requests.post(url, headers=headers, json=payload, timeout=5)
+    response.raise_for_status()
+    return response.json()
 
 def verify_signature(payload_body, signature_header):
     """Verify GitHub webhook signature using HMAC-SHA256."""
@@ -168,52 +256,124 @@ def webhook():
         
     except Conflict:
         logger.info(f"POST /webhook duplicate skipped (delivery_id: {delivery_id})")
-        return 'Accepted', 202
+        return jsonify({'status': 'duplicate'}), 202
     
     # Filter events: only handle issue_comment
     event_type = request.headers.get('X-GitHub-Event')
     
     if event_type != 'issue_comment':
         logger.info(f"POST /webhook ignored: event={event_type}")
-        return 'Accepted', 202
+        return jsonify({'status': 'ignored', 'reason': 'event_type'}), 202
     
     # Parse payload
     try:
         payload = request.get_json()
     except Exception as e:
         logger.error(f"Failed to parse JSON payload: {e}")
-        return 'Accepted', 202
+        return jsonify({'status': 'error', 'reason': 'invalid_json'}), 202
     
     # Filter action: only handle "created"
     action = payload.get('action')
     if action != 'created':
         logger.info(f"POST /webhook ignored: action={action}")
-        return 'Accepted', 202
-    
-    # Guard against loops: if comment starts with "ACK:", skip
-    comment_body = payload.get('comment', {}).get('body', '')
-    if comment_body.startswith('ACK:'):
-        logger.info("POST /webhook ignored: ACK comment (loop guard)")
-        return 'Accepted', 202
+        return jsonify({'status': 'ignored', 'reason': 'action'}), 202
     
     # Extract required fields
     installation_id = payload.get('installation', {}).get('id')
     repo_full_name = payload.get('repository', {}).get('full_name')
+    repo_owner = payload.get('repository', {}).get('owner', {}).get('login')
     issue_number = payload.get('issue', {}).get('number')
     comment_id = payload.get('comment', {}).get('id')
+    comment_user = payload.get('comment', {}).get('user', {}).get('login')
+    comment_user_type = payload.get('comment', {}).get('user', {}).get('type')
+    comment_body = payload.get('comment', {}).get('body', '')
     
     # Log metadata only (no bodies)
-    logger.info(f"issue_comment.created: installation_id={installation_id} repo={repo_full_name} issue=#{issue_number} comment_id={comment_id}")
+    logger.info(f"issue_comment.created: installation_id={installation_id} repo={repo_full_name} issue=#{issue_number} comment_id={comment_id} user={comment_user} user_type={comment_user_type}")
     
-    if not all([installation_id, repo_full_name, issue_number, comment_id]):
+    if not all([installation_id, repo_full_name, repo_owner, issue_number, comment_id, comment_user]):
         logger.error("Missing required fields in payload")
-        return 'Accepted', 202
+        return jsonify({'status': 'error', 'reason': 'missing_fields'}), 202
     
-    # Post ACK comment (best-effort with timeout)
-    # Return 202 immediately regardless of success
-    post_ack_comment(installation_id, repo_full_name, issue_number, comment_id, delivery_id)
+    # BOT GUARD: Ignore comments from Bot users to prevent loops
+    if comment_user_type == 'Bot':
+        logger.info(f"POST /webhook ignored: bot user={comment_user}")
+        return jsonify({'status': 'ignored', 'reason': 'bot_user'}), 202
     
-    return 'Accepted', 202
+    # PARSE BEFORE AUTH: Check if this is a command
+    command, args = parse_command(comment_body)
+    
+    # If not a command, post ACK and return (legacy behavior)
+    if command is None:
+        try:
+            installation_token = get_installation_access_token(installation_id)
+            ack_body = f"ACK: received comment_id={comment_id} delivery_id={delivery_id}"
+            result = post_comment(installation_token, repo_full_name, issue_number, ack_body)
+            logger.info(f"ACK posted: comment_id={result['id']} for issue #{issue_number}")
+            return jsonify({'status': 'ack_posted', 'comment_id': result['id']}), 202
+        except Exception as e:
+            logger.error(f"Failed to post ACK: {e.__class__.__name__}")
+            return jsonify({'status': 'error', 'reason': 'ack_failed'}), 202
+    
+    # SECURITY: Owner-only commands
+    if comment_user != repo_owner:
+        logger.warning(f"Unauthorized command attempt: user={comment_user} owner={repo_owner} command=/{command}")
+        return jsonify({'status': 'unauthorized', 'reason': 'not_owner'}), 202
+    
+    # Get installation token for command execution
+    try:
+        installation_token = get_installation_access_token(installation_id)
+    except Exception as e:
+        logger.error(f"Failed to get installation token: {e.__class__.__name__}")
+        try:
+            # Best-effort error comment
+            post_comment(installation_token, repo_full_name, issue_number, f"❌ Internal error: failed to authenticate")
+        except:
+            pass
+        return jsonify({'status': 'error', 'reason': 'auth_failed'}), 202
+    
+    # Execute command
+    try:
+        if command == 'label':
+            if not args:
+                post_comment(installation_token, repo_full_name, issue_number, "❌ Usage: `/label <label_name>`")
+                return jsonify({'status': 'error', 'reason': 'missing_args'}), 202
+            
+            add_label(installation_token, repo_full_name, issue_number, args)
+            post_comment(installation_token, repo_full_name, issue_number, f"✅ Label(s) added: `{', '.join(args)}`")
+            logger.info(f"Command executed: /label {args} on issue #{issue_number}")
+            return jsonify({'status': 'command_executed', 'command': 'label', 'args': args}), 202
+            
+        elif command == 'assign':
+            if not args:
+                post_comment(installation_token, repo_full_name, issue_number, "❌ Usage: `/assign @username`")
+                return jsonify({'status': 'error', 'reason': 'missing_args'}), 202
+            
+            assign_users(installation_token, repo_full_name, issue_number, args)
+            post_comment(installation_token, repo_full_name, issue_number, f"✅ Assigned: `{', '.join(args)}`")
+            logger.info(f"Command executed: /assign {args} on issue #{issue_number}")
+            return jsonify({'status': 'command_executed', 'command': 'assign', 'args': args}), 202
+            
+        else:
+            post_comment(installation_token, repo_full_name, issue_number, f"❌ Unknown command: `/{command}`")
+            logger.info(f"Unknown command: /{command} args={args}")
+            return jsonify({'status': 'unknown_command', 'command': command}), 202
+            
+    except requests.HTTPError as e:
+        status_code = e.response.status_code if e.response else 'unknown'
+        logger.error(f"GitHub API error: command=/{command} status={status_code}")
+        try:
+            post_comment(installation_token, repo_full_name, issue_number, f"❌ Failed to execute `/{command}`: API error {status_code}")
+        except:
+            pass
+        return jsonify({'status': 'api_error', 'command': command, 'http_status': status_code}), 202
+    except Exception as e:
+        logger.error(f"Command execution error: command=/{command} error={e.__class__.__name__}")
+        try:
+            post_comment(installation_token, repo_full_name, issue_number, f"❌ Failed to execute `/{command}`: internal error")
+        except:
+            pass
+        return jsonify({'status': 'error', 'command': command}), 202
 
 @app.route('/health', methods=['GET'])
 def health():
