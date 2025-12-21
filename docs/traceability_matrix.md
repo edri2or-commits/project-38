@@ -1,6 +1,6 @@
 # Traceability Matrix — Project 38 (V2)
 
-**Last Updated:** 2025-12-20 (GitHub Webhook Receiver - Command Parsing MVP Deployed)  
+**Last Updated:** 2025-12-21 (Stage 2A: Echo Bot via GitHub Actions)  
 **Purpose:** Track completion status and evidence for all project components
 
 ---
@@ -26,6 +26,7 @@
 | **Context Documentation** | ✅ DONE | PRE-BUILD | Files in docs/context/ | 4 canonical files created |
 | **GitHub App (project-38-scribe)** | ✅ DONE | Infrastructure | [GitHub App Docs](github-app/) | Created 2025-12-18 • Actions/Contents/Workflows R/W |
 | **GitHub Webhook Receiver** | ✅ DONE | Infrastructure | [Session Brief](sessions/2025-12-20_canary_deployment_100pct_rollout.md) | Cloud Run (us-central1) • Revision 00009-lfb • Command Parsing MVP (/label, /assign) • Deployed 2025-12-20 |
+| **Stage 2A: Echo Bot** | ✅ DONE | IssueOps | [Evidence](evidence/2025-12-21_stage_2a_echo_bot_e2e.txt) • [Issue #24](https://github.com/edri2or-commits/project-38/issues/24#issuecomment-3679601920) | GitHub Actions workflow • Gate 2A CLOSED • E2E loop verified • Deployed 2025-12-21 |
 | **Strategic Narrative (PROJECT_NARRATIVE.md)** | ✅ DONE | Phase 1 | Root file | Entry point document with "why" and "how" (2025-12-16) |
 | **Deployment Scripts** | ✅ DONE | Phase 2 | Root scripts | 4 automation scripts: deployment/scripts/fetch_secrets.sh, deployment/archive/startup.sh, p38_sync_secrets.ps1, gpt_google_workspace_schema.yaml (2025-12-16, commit c70a8a1) |
 | **Infrastructure (Slice 1 - VM Baseline)** | ✅ DONE | Slice 1 | [Execution Log](phase-2/slice-01_execution_log.md) | Completed 2025-12-15 • VM + Docker + IAM verified |
