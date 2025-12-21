@@ -1,6 +1,6 @@
 # Phase Status — Project 38 (V2)
 
-**Last Updated:** 2025-12-21 (Stage 2A: Echo Bot - Gate 2A CLOSED)
+**Last Updated:** 2025-12-21 (Stage 2B: LLM Integration - Gate 2B CLOSED)
 
 **Control Room:** [Issue #24](https://github.com/edri2or-commits/project-38/issues/24) — All decisions/gates/deployments posted there
 
@@ -110,6 +110,78 @@ POST /v3/projects/project-38-ai/notificationChannels/10887559702060583593:verify
 
 ---
 
+## ✅ RESOLVED: Stage 2B - LLM Integration (Gate 2B CLOSED - 2025-12-21)
+
+### Status: PRODUCTION VERIFIED
+**Session:** [GitHub Actions LLM Integration](../sessions/2025-12-21_stage2b_llm_deployment.md)
+**Evidence:** [docs/evidence/2025-12-21_stage_2b_llm_e2e.txt](../evidence/2025-12-21_stage_2b_llm_e2e.txt)
+
+**Objective:** LLM-powered IssueOps with OIDC/WIF security (zero GitHub Secrets)
+
+**Implementation:**
+- **Approach:** GitHub Actions + OIDC to GCP Secret Manager
+- **Workflow:** `.github/workflows/llm-bot-stage2b.yml`
+- **Commit:** c6b79d4 (PR #30)
+- **Deployment:** Merged to main
+
+**Security Architecture:**
+1. **OIDC/WIF Authentication:**
+   - Workload Identity Pool: github-actions-pool
+   - Provider: github-actions-provider
+   - Service Account: github-actions-llm@project-38-ai.iam.gserviceaccount.com
+   - Short-lived credentials (no static secrets)
+
+2. **Secret Manager Access:**
+   - OPENAI_API_KEY: project-38-ai/openai-api-key
+   - ANTHROPIC_API_KEY: project-38-ai/anthropic-api-key
+   - GEMINI_API_KEY: project-38-ai/gemini-api-key
+   - Runtime retrieval (not stored in GitHub)
+
+3. **Command Injection Prevention:**
+   - Line 51: `BODY=$(jq -r '.comment.body' "$GITHUB_EVENT_PATH")`
+   - Line 126: Python `json.load(GITHUB_EVENT_PATH)`
+   - ❌ NO heredoc with untrusted input
+
+4. **Access Control:**
+   - Lines 28-44: author_association check
+   - Allowed: OWNER, MEMBER only
+   - Blocked: CONTRIBUTOR, FIRST_TIME_CONTRIBUTOR, NONE
+
+**Guard Order (3 gates):**
+1. **Bot Guard:** Skip Bot users
+2. **Access Control:** OWNER/MEMBER only (NEW in Stage 2B)
+3. **Command Guard:** /ask or /plan only
+
+**Trigger:**
+- Event: `issue_comment.created`
+- Scope: Issue #24 only
+- Commands: `/ask` or `/plan`
+
+**Gate 2B Verification:**
+- **Test Command:** #3679660658 (User: edri2or-commits, Body: `/ask What is the current phase status?`)
+- **LLM Response:** #3679660787 (User: github-actions[bot], Model: claude-sonnet-4-20250514)
+- **Workflow Run:** #20417158558 (Status: success, Duration: ~30s)
+- **Secret Access:** ✅ VERIFIED (all 3 keys retrieved from Secret Manager)
+- **Secrets Masking:** ✅ VERIFIED (*** in logs)
+
+**Context Loading:**
+- docs/_system/SYSTEM_MAP.md (2000 chars)
+- docs/context/phase_status.md (2000 chars)
+
+**LLM Configuration:**
+- Provider: Anthropic
+- Model: claude-sonnet-4-20250514
+- Max Tokens: 1000
+- System Prompt: Project 38 IssueOps assistant
+
+**Gate 2B Status:** ✅ CLOSED
+- Evidence SHA256: A667006885C6744F1B0169EA9C3A222D8CD8F0E72A2C3481DDDC2ECFE40A05FF
+- Control Room: [Issue #24 Comment](https://github.com/edri2or-commits/project-38/issues/24#issuecomment-3679664969)
+
+**Next:** POC-03 - Full Conversation Flow
+
+---
+
 ## ✅ RESOLVED: Local Docker Compose Secret Issue (2025-12-17)
 
 ### Status: STABLE
@@ -181,9 +253,9 @@ POST /v3/projects/project-38-ai/notificationChannels/10887559702060583593:verify
 
 ## Current Phase: STAGE 2 - ISSUEOPS AUTOMATION
 
-**Status:** Stage 2A ✅ (Echo Bot) | Stage 2B 📋 (LLM Integration)
+**Status:** Stage 2A ✅ (Echo Bot) | Stage 2B ✅ (LLM Integration)
 
-**Mode:** GitHub Actions IssueOps operational
+**Mode:** GitHub Actions IssueOps operational with LLM capabilities
 
 ---
 
@@ -340,9 +412,9 @@ POST /v3/projects/project-38-ai/notificationChannels/10887559702060583593:verify
 ✅ DONE    → Slice 2A: N8N Deployment
 ✅ DONE    → Observability Guardrails
 ✅ DONE    → Stage 2A: Echo Bot (GitHub Actions)
+✅ DONE    → Stage 2B: LLM Integration (OIDC/WIF to GCP)
 ✅ PASS    → POC-01: Headless Activation + Hardening
 ✅ PASS    → POC-02: Telegram Webhook Integration
-📋 NEXT    → Stage 2B: LLM Integration (OIDC/WIF to GCP)
 📋 NEXT    → POC-03: Full Conversation Flow
 ⏸️ DEFERRED → Slice 2B/3: Kernel Deployment
 ⏸️ FUTURE  → PROD Mirror
@@ -354,10 +426,14 @@ POST /v3/projects/project-38-ai/notificationChannels/10887559702060583593:verify
 
 ### GitHub Actions (IssueOps)
 - ✅ Echo Bot: Active (Issue #24 only)
+- ✅ LLM Bot: Active (OIDC/WIF to GCP)
 - ✅ Workflow: `.github/workflows/echo-bot.yml`
-- ✅ Authentication: Built-in GITHUB_TOKEN
+- ✅ Workflow: `.github/workflows/llm-bot-stage2b.yml`
+- ✅ Authentication: Built-in GITHUB_TOKEN + OIDC to GCP
 - ✅ Loop Prevention: 3 guards operational
-- 📋 Next: LLM Integration (Stage 2B)
+- ✅ Access Control: OWNER/MEMBER only
+- ✅ Commands: /ask, /plan
+- 📋 Next: POC-03 Full Conversation Flow
 
 ### DEV (project-38-ai)
 - ✅ VM: p38-dev-vm-01 (136.111.39.139)
@@ -372,7 +448,8 @@ POST /v3/projects/project-38-ai/notificationChannels/10887559702060583593:verify
 
 **Current Status:** 
 - Stage 2A (Echo Bot): ✅ DEPLOYED | Gate 2A CLOSED
+- Stage 2B (LLM Integration): ✅ DEPLOYED | Gate 2B CLOSED
 - Observability: ✅ Metrics + Alerts + Verified notification channel
 - POC-02 (Telegram): ✅ PASS
 - Secrets: ✅ PRODUCTION READY
-- Next: Stage 2B (LLM Integration via OIDC/WIF)
+- Next: POC-03 Full Conversation Flow
