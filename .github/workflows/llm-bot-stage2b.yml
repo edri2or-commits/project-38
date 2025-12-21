@@ -1,0 +1,204 @@
+name: LLM Bot - Stage 2B
+
+on:
+  issue_comment:
+    types: [created]
+
+# Required for OIDC authentication to GCP
+permissions:
+  contents: read
+  id-token: write
+  issues: write
+
+jobs:
+  llm-response:
+    # Only run on Issue #24 (Control Room)
+    if: github.event.issue.number == 24
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Bot Guard - Skip if comment from Bot user
+        id: bot_check
+        run: |
+          if [ "${{ github.event.comment.user.type }}" == "Bot" ]; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+            echo "::notice::Skipping: Bot user detected (${{ github.event.comment.user.login }})"
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Access Control - Only repo OWNER/MEMBER can use LLM
+        id: access_check
+        if: steps.bot_check.outputs.skip == 'false'
+        run: |
+          AUTHOR_ASSOCIATION="${{ github.event.comment.author_association }}"
+          
+          # Only OWNER or MEMBER can trigger LLM
+          if [[ "$AUTHOR_ASSOCIATION" == "OWNER" || "$AUTHOR_ASSOCIATION" == "MEMBER" ]]; then
+            echo "skip=false" >> $GITHUB_OUTPUT
+            echo "::notice::Access granted - $AUTHOR_ASSOCIATION (${{ github.event.comment.user.login }})"
+          else
+            echo "skip=true" >> $GITHUB_OUTPUT
+            echo "::notice::Access denied - $AUTHOR_ASSOCIATION (${{ github.event.comment.user.login }})"
+          fi
+      
+      - name: Command Guard - Only /ask or /plan
+        id: command_check
+        if: steps.bot_check.outputs.skip == 'false' && steps.access_check.outputs.skip == 'false'
+        run: |
+          # Safe: Read comment body from GITHUB_EVENT_PATH with jq (no heredoc injection)
+          BODY=$(jq -r '.comment.body' "$GITHUB_EVENT_PATH")
+          
+          # Check if comment starts with /ask or /plan
+          if echo "$BODY" | grep -qE '^\s*/ask|^\s*/plan'; then
+            echo "skip=false" >> $GITHUB_OUTPUT
+            echo "::notice::Command detected - proceeding with LLM"
+          else
+            echo "skip=true" >> $GITHUB_OUTPUT
+            echo "::notice::No /ask or /plan command - skipping LLM"
+          fi
+      
+      - name: Checkout repository
+        if: steps.bot_check.outputs.skip == 'false' && steps.access_check.outputs.skip == 'false' && steps.command_check.outputs.skip == 'false'
+        uses: actions/checkout@v4
+      
+      - name: Authenticate to Google Cloud
+        if: steps.bot_check.outputs.skip == 'false' && steps.access_check.outputs.skip == 'false' && steps.command_check.outputs.skip == 'false'
+        id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: 'projects/673161610630/locations/global/workloadIdentityPools/github-actions-pool/providers/github-actions-provider'
+          service_account: 'github-actions-llm@project-38-ai.iam.gserviceaccount.com'
+      
+      - name: Get secrets from Secret Manager
+        if: steps.bot_check.outputs.skip == 'false' && steps.access_check.outputs.skip == 'false' && steps.command_check.outputs.skip == 'false'
+        id: secrets
+        uses: google-github-actions/get-secretmanager-secrets@v2
+        with:
+          secrets: |-
+            OPENAI_API_KEY:project-38-ai/openai-api-key
+            ANTHROPIC_API_KEY:project-38-ai/anthropic-api-key
+            GEMINI_API_KEY:project-38-ai/gemini-api-key
+      
+      - name: Load context from repo
+        if: steps.bot_check.outputs.skip == 'false' && steps.access_check.outputs.skip == 'false' && steps.command_check.outputs.skip == 'false'
+        id: context
+        run: |
+          # Read SYSTEM_MAP and phase_status
+          SYSTEM_MAP=$(cat docs/_system/SYSTEM_MAP.md)
+          PHASE_STATUS=$(cat docs/context/phase_status.md)
+          
+          # Encode for safe passing
+          echo "SYSTEM_MAP<<EOF" >> $GITHUB_ENV
+          echo "$SYSTEM_MAP" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+          
+          echo "PHASE_STATUS<<EOF" >> $GITHUB_ENV
+          echo "$PHASE_STATUS" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+      
+      - name: Set up Python
+        if: steps.bot_check.outputs.skip == 'false' && steps.access_check.outputs.skip == 'false' && steps.command_check.outputs.skip == 'false'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        if: steps.bot_check.outputs.skip == 'false' && steps.access_check.outputs.skip == 'false' && steps.command_check.outputs.skip == 'false'
+        run: |
+          pip install openai anthropic google-generativeai
+      
+      - name: Generate LLM response
+        if: steps.bot_check.outputs.skip == 'false' && steps.access_check.outputs.skip == 'false' && steps.command_check.outputs.skip == 'false'
+        id: llm
+        env:
+          OPENAI_API_KEY: ${{ steps.secrets.outputs.OPENAI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ steps.secrets.outputs.ANTHROPIC_API_KEY }}
+          GEMINI_API_KEY: ${{ steps.secrets.outputs.GEMINI_API_KEY }}
+          GITHUB_EVENT_PATH: ${{ github.event_path }}
+        run: |
+          python3 << 'PYTHON_EOF'
+          import os
+          import json
+          from anthropic import Anthropic
+          
+          # Safe: Read comment body from GITHUB_EVENT_PATH (no injection risk)
+          with open(os.environ["GITHUB_EVENT_PATH"], "r") as f:
+              event = json.load(f)
+          
+          comment_body = event["comment"]["body"]
+          comment_user = event["comment"]["user"]["login"]
+          
+          # Load context
+          system_map = os.environ.get("SYSTEM_MAP", "")
+          phase_status = os.environ.get("PHASE_STATUS", "")
+          
+          # Extract command and query
+          command_line = comment_body.strip().split('\n')[0]
+          query = comment_body[len(command_line):].strip()
+          
+          # Build system prompt
+          system_prompt = f"""You are the Project 38 IssueOps assistant.
+          
+          CONTEXT:
+          
+          SYSTEM MAP:
+          {system_map[:2000]}
+          
+          PHASE STATUS:
+          {phase_status[:2000]}
+          
+          Your role: Answer questions about Project 38 status, architecture, and next steps.
+          Keep responses concise (2-3 paragraphs max).
+          Reference SSOT files when relevant.
+          """
+          
+          # Call Claude
+          client = Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
+          
+          message = client.messages.create(
+              model="claude-sonnet-4-20250514",
+              max_tokens=1000,
+              system=system_prompt,
+              messages=[
+                  {
+                      "role": "user",
+                      "content": f"@{comment_user} asked: {query if query else command_line}"
+                  }
+              ]
+          )
+          
+          response_text = message.content[0].text
+          
+          # Prepare output
+          output = f"""🤖 **LLM Response** (Claude Sonnet 4)
+
+{response_text}
+
+---
+*Command: `{command_line.split()[0]}`*
+*Model: claude-sonnet-4-20250514*
+<!-- P38_LLM_RESPONSE -->"""
+          
+          # Write to GITHUB_ENV for next step
+          with open(os.environ["GITHUB_ENV"], "a") as f:
+              f.write("LLM_RESPONSE<<EOF\n")
+              f.write(output)
+              f.write("\nEOF\n")
+          
+          print("::notice::LLM response generated successfully")
+          PYTHON_EOF
+      
+      - name: Post LLM response to issue
+        if: steps.bot_check.outputs.skip == 'false' && steps.access_check.outputs.skip == 'false' && steps.command_check.outputs.skip == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api \
+            --method POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            /repos/${{ github.repository }}/issues/${{ github.event.issue.number }}/comments \
+            -f body="$LLM_RESPONSE"
+          
+          echo "::notice::LLM response posted to Issue #${{ github.event.issue.number }}"
