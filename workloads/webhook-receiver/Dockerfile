@@ -2,6 +2,10 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
+# Cache buster for forcing rebuild
+ARG BUILD_VERSION=unknown
+ENV BUILD_VERSION=${BUILD_VERSION}
+
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
