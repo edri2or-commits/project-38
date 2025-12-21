@@ -1,6 +1,6 @@
 # Phase Status — Project 38 (V2)
 
-**Last Updated:** 2025-12-21 (Control Room Established + Gate A Closure)
+**Last Updated:** 2025-12-21 (Stage 2A: Echo Bot - Gate 2A CLOSED)
 
 **Control Room:** [Issue #24](https://github.com/edri2or-commits/project-38/issues/24) — All decisions/gates/deployments posted there
 
@@ -53,6 +53,60 @@ POST /v3/projects/project-38-ai/notificationChannels/10887559702060583593:verify
 **Evidence:** 
 - File: docs/evidence/2025-12-21_notification_channel_verification.txt
 - Contains: API requests/responses, verification code, channel status
+
+---
+
+## ✅ RESOLVED: Stage 2A - Echo Bot (Gate 2A CLOSED - 2025-12-21)
+
+### Status: PRODUCTION VERIFIED
+**Session:** [GitHub Actions Echo Bot Deployment](../sessions/2025-12-21_stage2a_echo_bot_deployment.md)
+**Evidence:** [docs/evidence/2025-12-21_stage_2a_echo_bot_e2e.txt](../evidence/2025-12-21_stage_2a_echo_bot_e2e.txt)
+
+**Objective:** E2E loop proof (Control Room → Echo → ACK) before LLM integration
+
+**Implementation:**
+- **Approach:** GitHub Actions IssueOps (replaced Cloud Run webhooks)
+- **Workflow:** `.github/workflows/echo-bot.yml`
+- **Commit:** 2c341ec (PR #28)
+- **Deployment:** Merged to main
+
+**Trigger:**
+- Event: `issue_comment.created`
+- Scope: Issue #24 only
+
+**Loop Prevention (3 guards):**
+1. **Issue Scope Guard:** Only Issue #24 (if: github.event.issue.number == 24)
+2. **Bot Guard:** Skip if user.type == 'Bot'
+3. **Echo Marker Guard:** Skip if body contains 'P38_ECHO_ACK'
+
+**ACK Format:**
+```
+✅ Echo: Received from @{username}
+<!-- P38_ECHO_ACK -->
+```
+
+**Gate 2A Verification:**
+- **Test Comment:** #3679597921 (User: edri2or-commits)
+- **ACK Posted:** #3679597972 (User: github-actions[bot])
+- **Workflow Run:** #20416387220 (Status: success, Duration: ~4s)
+- **Loop Prevention:** ✅ VERIFIED (only 1 run, ACK did not trigger new workflow)
+
+**Why GitHub Actions > Webhooks:**
+- ✅ No webhook infrastructure
+- ✅ No installation_id issues
+- ✅ Built-in GITHUB_TOKEN
+- ✅ Simple deployment (just merge)
+- ✅ Clear logs and debugging
+
+**Cleanup:**
+- 🧹 Repository webhook removed (ID: 587249397) - no longer needed
+- 📝 Cloud Run service remains deployed but receives no webhooks
+
+**Gate 2A Status:** ✅ CLOSED
+- Evidence SHA256: 58C11E112A5569B703353E959E8766FC361CB87FF44A108B36D72B344E317022
+- Control Room: [Issue #24 Comment](https://github.com/edri2or-commits/project-38/issues/24#issuecomment-3679601920)
+
+**Next:** Stage 2B - LLM Integration via OIDC/WIF to GCP
 
 ---
 
@@ -125,11 +179,11 @@ POST /v3/projects/project-38-ai/notificationChannels/10887559702060583593:verify
 
 ---
 
-## Current Phase: PHASE 2 - WORKLOAD DEPLOYMENT
+## Current Phase: STAGE 2 - ISSUEOPS AUTOMATION
 
-**Status:** Slice 2A ✅ | POC-01 ✅ | POC-02 ✅ | POC-03 ⏸️ (Activation Required) | Observability ✅
+**Status:** Stage 2A ✅ (Echo Bot) | Stage 2B 📋 (LLM Integration)
 
-**Mode:** DEV environment operational
+**Mode:** GitHub Actions IssueOps operational
 
 ---
 
@@ -285,8 +339,10 @@ POST /v3/projects/project-38-ai/notificationChannels/10887559702060583593:verify
 ✅ DONE    → Slice 1: DEV VM Baseline
 ✅ DONE    → Slice 2A: N8N Deployment
 ✅ DONE    → Observability Guardrails
+✅ DONE    → Stage 2A: Echo Bot (GitHub Actions)
 ✅ PASS    → POC-01: Headless Activation + Hardening
 ✅ PASS    → POC-02: Telegram Webhook Integration
+📋 NEXT    → Stage 2B: LLM Integration (OIDC/WIF to GCP)
 📋 NEXT    → POC-03: Full Conversation Flow
 ⏸️ DEFERRED → Slice 2B/3: Kernel Deployment
 ⏸️ FUTURE  → PROD Mirror
@@ -295,6 +351,13 @@ POST /v3/projects/project-38-ai/notificationChannels/10887559702060583593:verify
 ---
 
 ## Current Environment
+
+### GitHub Actions (IssueOps)
+- ✅ Echo Bot: Active (Issue #24 only)
+- ✅ Workflow: `.github/workflows/echo-bot.yml`
+- ✅ Authentication: Built-in GITHUB_TOKEN
+- ✅ Loop Prevention: 3 guards operational
+- 📋 Next: LLM Integration (Stage 2B)
 
 ### DEV (project-38-ai)
 - ✅ VM: p38-dev-vm-01 (136.111.39.139)
@@ -307,4 +370,9 @@ POST /v3/projects/project-38-ai/notificationChannels/10887559702060583593:verify
 
 ---
 
-**Current Status:** Observability ✅ | POC-02 PASS ✅ | Secrets PRODUCTION READY ✅ | Ready for POC-03 or Kernel deployment
+**Current Status:** 
+- Stage 2A (Echo Bot): ✅ DEPLOYED | Gate 2A CLOSED
+- Observability: ✅ Metrics + Alerts + Verified notification channel
+- POC-02 (Telegram): ✅ PASS
+- Secrets: ✅ PRODUCTION READY
+- Next: Stage 2B (LLM Integration via OIDC/WIF)
