@@ -300,6 +300,16 @@ def webhook():
         logger.info(f"POST /webhook ignored: bot user={comment_user}")
         return jsonify({'status': 'ignored', 'reason': 'bot_user'}), 202
     
+    # ECHO MARKER GUARD: Prevent echo loop
+    if 'P38_ECHO_ACK' in comment_body:
+        logger.info(f"POST /webhook ignored: echo marker detected")
+        return jsonify({'status': 'ignored', 'reason': 'echo_marker'}), 202
+    
+    # CONTROL ROOM SCOPE: Only handle Issue #24 for echo bot
+    if issue_number != 24:
+        logger.info(f"POST /webhook ignored: issue=#{issue_number} (not Control Room)")
+        return jsonify({'status': 'ignored', 'reason': 'not_control_room'}), 202
+    
     # PARSE BEFORE AUTH: Check if this is a command
     command, args = parse_command(comment_body)
     
@@ -307,13 +317,14 @@ def webhook():
     if command is None:
         try:
             installation_token = get_installation_access_token(installation_id)
-            ack_body = f"ACK: received comment_id={comment_id} delivery_id={delivery_id}"
+            # Short ACK format with echo marker (Control Room Issue #24 only)
+            ack_body = f"✅ Echo: Received from @{comment_user}\n<!-- P38_ECHO_ACK -->"
             result = post_comment(installation_token, repo_full_name, issue_number, ack_body)
-            logger.info(f"ACK posted: comment_id={result['id']} for issue #{issue_number}")
-            return jsonify({'status': 'ack_posted', 'comment_id': result['id']}), 202
+            logger.info(f"Echo ACK posted: comment_id={result['id']} for issue #{issue_number}")
+            return jsonify({'status': 'echo_posted', 'comment_id': result['id']}), 202
         except Exception as e:
-            logger.error(f"Failed to post ACK: {e.__class__.__name__}")
-            return jsonify({'status': 'error', 'reason': 'ack_failed'}), 202
+            logger.error(f"Failed to post echo ACK: {e.__class__.__name__}")
+            return jsonify({'status': 'error', 'reason': 'echo_failed'}), 202
     
     # SECURITY: Owner-only commands
     if comment_user != repo_owner:
