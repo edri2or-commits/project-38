@@ -1,8 +1,9 @@
 # Project 38 V2 — Strategic Narrative
 
-**Last Updated:** 2025-12-16  
-**Status:** Phase 2 — Infrastructure Baseline Complete  
-**Quick Links:** [Architecture Decisions](#architecture-decisions) · [Current State](#where-we-are-now) · [Operating Model](#operating-model)
+**Last Updated:** 2025-12-21  
+**Status:** Phase 2 — Infrastructure & IssueOps Active  
+**Control Room:** [Issue #24](https://github.com/edri2or-commits/project-38/issues/24) — Chat & state authority  
+**Quick Links:** [SYSTEM_MAP.md](docs/_system/SYSTEM_MAP.md) · [Architecture Decisions](#architecture-decisions) · [Current State](#where-we-are-now) · [Operating Model](#operating-model)
 
 ---
 
@@ -327,6 +328,10 @@ V2 Fixed Flow:
 | **Service Account (n8n)** | `n8n-runtime@...` | ✅ ATTACHED | Access to 3 secrets verified |
 | **Service Account (kernel)** | `kernel-runtime@...` | ✅ CREATED | Access to 4 secrets verified |
 | **Service Account (CI/CD)** | `github-actions-deployer@...` | ✅ CREATED | Access to all 7 secrets |
+| **N8N Workflows** | - | ✅ ACTIVE | POC-02 (Telegram), POC-03 (Conversation Flow) |
+| **GitHub App** | `project-38-scribe` | ✅ ACTIVE | App ID 2497877, webhook verified |
+| **Cloud Run** | `github-webhook-receiver` | ✅ ACTIVE | IssueOps commands (/label, /assign, ACK) |
+| **Observability** | Alert Policies (3) | ✅ ENABLED | Notification channel verified (Gate A) |
 
 **Evidence:** [Slice 1 Execution Log](docs/phase-2/slice-01_execution_log.md)
 
@@ -369,17 +374,33 @@ V2 Fixed Flow:
   - Evidence pack captured with SHA256 verification
   - [Execution Log](docs/phase-2/slice-01_execution_log.md)
 
+- ✅ **Slice 2A DONE** (2025-12-16):
+  - N8N + PostgreSQL deployed (Docker Compose)
+  - 3 secrets injected via Secret Manager
+  - SSH tunnel access verified (localhost:5678)
+  - [Execution Log](docs/phase-2/slice-02a_execution_log.md)
+
+- ✅ **POC-01 PASS** (2025-12-18):
+  - N8N headless activation verified
+  - Workflow activation via API
+  - [Evidence](docs/evidence/2025-12-18_poc01_pass.txt)
+
+- ✅ **POC-02 PASS** (2025-12-18):
+  - Telegram webhook integration verified
+  - Fast-ACK pattern (48-213ms response)
+  - [Evidence](docs/evidence/2025-12-18_poc02_pass.txt)
+
+- ✅ **IssueOps Control (2025-12-20 - 2025-12-21)**:
+  - GitHub App (project-38-scribe) configured
+  - Cloud Run webhook receiver deployed
+  - Commands: /label, /assign, ACK
+  - Observability: 3 alert policies, verified notification channel (Gate A)
+  - Control Room Issue #24 established
+  - [SYSTEM_MAP.md](docs/_system/SYSTEM_MAP.md)
+
 #### 📋 PLANNED (Documentation Ready, Awaiting Approval)
 
-**Slice 2A: N8N + Postgres Deployment**
-- **Scope:** 2 services (n8n, postgres), 3 secrets, SSH port-forward access
-- **Duration Estimate:** 20-30 minutes
-- **Service Account:** n8n-runtime (least privilege: 3 secrets only)
-- **Documentation:**
-  - ✅ [Runbook](docs/phase-2/slice-02a_runbook.md) (557 lines)
-  - ✅ [Evidence Pack Template](docs/phase-2/slice-02a_evidence_pack.md) (427 lines)
-  - ✅ [Rollback Plan](docs/phase-2/slice-02a_rollback_plan.md) (508 lines)
-- **Approval Required:** User must say **"Execute Slice 2A"**
+_(Moved to "NEXT DECISION" section - see Control Room Issue #24)_
 
 #### ⏸️ DEFERRED (Pending Decisions)
 
