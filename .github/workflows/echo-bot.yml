@@ -1,0 +1,55 @@
+name: Echo Bot - Stage 2A
+
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  echo:
+    # Only run on Issue #24 (Control Room)
+    if: github.event.issue.number == 24
+    runs-on: ubuntu-latest
+    
+    permissions:
+      issues: write
+    
+    steps:
+      - name: Bot Guard - Skip if comment from Bot user
+        id: bot_check
+        run: |
+          if [ "${{ github.event.comment.user.type }}" == "Bot" ]; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+            echo "::notice::Skipping: Bot user detected (${{ github.event.comment.user.login }})"
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Echo Marker Guard - Skip if comment contains P38_ECHO_ACK
+        id: marker_check
+        if: steps.bot_check.outputs.skip == 'false'
+        run: |
+          BODY=$(cat << 'EOF'
+          ${{ github.event.comment.body }}
+          EOF
+          )
+          if echo "$BODY" | grep -q "P38_ECHO_ACK"; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+            echo "::notice::Skipping: Echo marker P38_ECHO_ACK detected"
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Post Echo ACK
+        if: steps.bot_check.outputs.skip == 'false' && steps.marker_check.outputs.skip == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api \
+            --method POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            /repos/${{ github.repository }}/issues/${{ github.event.issue.number }}/comments \
+            -f body="✅ Echo: Received from @${{ github.event.comment.user.login }}
+          <!-- P38_ECHO_ACK -->"
+          
+          echo "::notice::Echo ACK posted for comment ${{ github.event.comment.id }}"
