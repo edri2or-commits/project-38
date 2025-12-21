@@ -1,0 +1,135 @@
+# File Registry — Project 38
+# DO NOT create new files without adding them here first
+# Format: path, purpose, maintainer, status, created/updated
+
+---
+## Canon Files (SSOT - Authoritative)
+
+- path: docs/_system/SYSTEM_MAP.md
+  purpose: Navigation hub, IssueOps architecture
+  maintainer: Claude
+  status: active
+  created: 2025-12-21
+  updated: 2025-12-21
+  
+- path: docs/_system/_registry.yml
+  purpose: This file - tracks all documentation files
+  maintainer: Claude
+  status: active
+  created: 2025-12-21
+
+- path: docs/context/phase_status.md
+  purpose: Current phase state, gates, next steps
+  maintainer: Claude
+  status: active
+  updated: 2025-12-21
+  
+- path: docs/context/project_facts.md
+  purpose: Immutable project facts (GCP IDs, GitHub App ID, etc.)
+  maintainer: Claude
+  status: active
+  
+- path: docs/context/operating_rules.md
+  purpose: Operating procedures, constraints, security rules
+  maintainer: Claude
+  status: active
+  
+- path: docs/traceability_matrix.md
+  purpose: Decision → Implementation tracking (ADR → commit SHA)
+  maintainer: Claude
+  status: active
+
+---
+## Evidence Files (Permanent)
+
+# Pattern: docs/evidence/YYYY-MM-DD_<event>.txt
+# Purpose: RAW proof of execution (API responses, logs, gates)
+# Retention: permanent
+# Naming: date_event-description.txt
+
+- path: docs/evidence/2025-12-21_notification_channel_verification.txt
+  purpose: Gate A closure proof (email verification)
+  maintainer: Claude
+  created: 2025-12-21
+
+---
+## Architecture Decision Records (Permanent)
+
+# Pattern: docs/adr/ADR-NNN_<title>.md
+# Purpose: Record architectural decisions with context, options, rationale
+# Retention: permanent
+# Naming: ADR-001_title-with-hyphens.md
+
+# (empty - no ADRs created yet)
+
+---
+## Session Summaries (Historical)
+
+# Pattern: docs/sessions/YYYY-MM-DD_<session-name>.md
+# Purpose: Session work summaries, not SSOT
+# Retention: 90 days recommended (can be archived)
+
+# Files:
+# - 2025-12-17_local_secret_fix.md
+# - 2025-12-17_drift_verification.md
+# - 2025-12-17_redeploy_summary.md
+# - 2025-12-17_poc03_issues.md
+# - 2025-12-20_e2e_alert_test.md
+
+---
+## POC Documentation (Frozen)
+
+# Pattern: docs/phase-2/poc-NN_<name>.md
+# Purpose: POC validation evidence
+# Retention: permanent (frozen after POC completion)
+# Status: read-only after POC PASS
+
+- path: docs/phase-2/poc-01_headless_hardening.md
+  purpose: POC-01 validation evidence
+  maintainer: Claude
+  status: frozen
+  created: 2025-12-16
+
+- path: docs/phase-2/poc-02_telegram_webhook.md
+  purpose: POC-02 validation evidence
+  maintainer: Claude
+  status: frozen
+  created: 2025-12-16
+
+---
+## Deprecated (Migrate or Delete)
+
+- path: docs/state/current_state.md
+  purpose: Infrastructure snapshot
+  maintainer: Claude
+  status: DEPRECATED
+  action: Migrate unique content to phase_status.md, then delete
+  deadline: 2025-12-28
+
+---
+## Generated/Auto (Do Not Track)
+
+# These are auto-generated and not tracked in registry:
+# - /mnt/transcripts/*.txt (Claude conversation archives)
+# - C:\Users\edri2\project_38\*.txt (temp files - should be deleted)
+# - C:\Users\edri2\project_38\*.json (temp configs - should be deleted)
+
+---
+## Creation Rules
+
+Before creating ANY new documentation file:
+
+1. Check if content can fit in existing canon file
+2. Add entry to this registry first (path, purpose, maintainer)
+3. Update SYSTEM_MAP.md if structural
+4. Post to Control Room Issue (#24) if decision-related
+5. Commit with message: "docs: add [filename] - [purpose]"
+
+Exceptions (no registry needed):
+- Evidence files (follow naming pattern)
+- Temp files (must be in .gitignore)
+- Generated files (transcripts, logs)
+
+---
+Last updated: 2025-12-21
+Maintainer: Claude for Project 38

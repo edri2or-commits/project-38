@@ -4,6 +4,15 @@
 
 ---
 
+## 🎯 Control Room
+
+**→ [Issue #24 — Control Room (Chat & State Authority)](https://github.com/edri2or-commits/project-38/issues/24) ←**
+
+**Current State:** All decisions, gates, and deployments tracked here  
+**Navigation:** [SYSTEM_MAP.md](docs/_system/SYSTEM_MAP.md) — Complete project navigation
+
+---
+
 ## 🚀 Start Here
 
 **New to the project?** Read this first:
@@ -26,11 +35,13 @@
 
 ### Current Status
 - **Phase:** Phase 2 — Infrastructure & Deployment
-- **Slice:** Slice 1 ✅ DONE (VM baseline), Slice 2A 📋 PLANNED (N8N deployment)
+- **Status:** Slice 2A ✅ DONE, POC-01 ✅ PASS, POC-02 ✅ PASS, Observability ✅ ACTIVE
 - **Environment:** DEV (`project-38-ai`)
 
 ### Key Links
-- [Strategic Narrative](PROJECT_NARRATIVE.md) — Start here (entry point)
+- **[Control Room (Issue #24)](https://github.com/edri2or-commits/project-38/issues/24)** — Chat & state authority
+- **[SYSTEM_MAP.md](docs/_system/SYSTEM_MAP.md)** — Navigation hub (start here)
+- [Strategic Narrative](PROJECT_NARRATIVE.md) — Why/What/How entry point
 - [Traceability Matrix](docs/traceability_matrix.md) — Current status dashboard
 - [Operating Rules](docs/context/operating_rules.md) — How we operate
 - [Session Start Packet](docs/context/session_start_packet.md) — For new Claude sessions
@@ -38,9 +49,12 @@
 ### Documentation Structure
 ```
 project-38/
-├── PROJECT_NARRATIVE.md          ← YOU ARE HERE (entry point)
+├── PROJECT_NARRATIVE.md          ← Entry point (why/what/how)
 ├── README.md                     ← Quick links (this file)
 ├── docs/
+│   ├── _system/                  ← Navigation and registry
+│   │   ├── SYSTEM_MAP.md         ← Complete navigation hub
+│   │   └── _registry.yml         ← File tracking (sprawl prevention)
 │   ├── context/                  ← Source of truth (facts, rules, status)
 │   ├── phase-1/                  ← Planning & analysis
 │   ├── phase-2/                  ← Deployment artifacts
@@ -93,4 +107,4 @@ project-38/
 
 ---
 
-*Last Updated: 2025-12-16*
+*Last Updated: 2025-12-21*

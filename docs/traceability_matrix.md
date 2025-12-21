@@ -1,6 +1,6 @@
 # Traceability Matrix — Project 38 (V2)
 
-**Last Updated:** 2025-12-18 (GitHub App Created)  
+**Last Updated:** 2025-12-20 (GitHub Webhook Receiver - Command Parsing MVP Deployed)  
 **Purpose:** Track completion status and evidence for all project components
 
 ---
@@ -25,6 +25,7 @@
 | **IAM (Service Accounts)** | ✅ DONE | PRE-BUILD | IAM_OK | 3 SA per project + least privilege matrix |
 | **Context Documentation** | ✅ DONE | PRE-BUILD | Files in docs/context/ | 4 canonical files created |
 | **GitHub App (project-38-scribe)** | ✅ DONE | Infrastructure | [GitHub App Docs](github-app/) | Created 2025-12-18 • Actions/Contents/Workflows R/W |
+| **GitHub Webhook Receiver** | ✅ DONE | Infrastructure | [Session Brief](sessions/2025-12-20_canary_deployment_100pct_rollout.md) | Cloud Run (us-central1) • Revision 00009-lfb • Command Parsing MVP (/label, /assign) • Deployed 2025-12-20 |
 | **Strategic Narrative (PROJECT_NARRATIVE.md)** | ✅ DONE | Phase 1 | Root file | Entry point document with "why" and "how" (2025-12-16) |
 | **Deployment Scripts** | ✅ DONE | Phase 2 | Root scripts | 4 automation scripts: deployment/scripts/fetch_secrets.sh, deployment/archive/startup.sh, p38_sync_secrets.ps1, gpt_google_workspace_schema.yaml (2025-12-16, commit c70a8a1) |
 | **Infrastructure (Slice 1 - VM Baseline)** | ✅ DONE | Slice 1 | [Execution Log](phase-2/slice-01_execution_log.md) | Completed 2025-12-15 • VM + Docker + IAM verified |
@@ -110,11 +111,9 @@
 **Webhook Configuration:**
 - Status: ✅ ACTIVE (configured and verified in production)
 - URL: https://github-webhook-receiver-u7gbgdjoja-uc.a.run.app/webhook
-- Features: Signature verification (HMAC-SHA256), Firestore idempotency, Fast-ACK (202)
-- TTL: ACTIVE (documents expire after 24h; deletion not immediate, typically within 24h after expiration)
-- Note: TTL does not delete subcollections
-- Deployment: Cloud Run (us-central1), revision github-webhook-receiver-00006-n54
-- Ref: PR #15, Issue #14
+- Features: Signature verification (HMAC-SHA256), Firestore idempotency, Fast-ACK (202), Command Parsing (/label, /assign)
+- Deployment: Cloud Run (us-central1), revision github-webhook-receiver-00009-lfb (deployed 2025-12-20)
+- Ref: PR #17 (Command Parsing MVP)
 
 **Installation Scope:**
 - Account: edri2or-commits only
@@ -140,6 +139,66 @@
 - [ ] Set up monitoring for API rate limits
 
 **Action Required:** None — App is ready for use in automation
+
+---
+
+## Detailed Status: GitHub Webhook Receiver
+
+### Status: ✅ DONE (Command Parsing MVP Deployed 2025-12-20)
+
+**Documentation:**
+- [Deployment Session Brief](sessions/2025-12-20_canary_deployment_100pct_rollout.md)
+- [SSOT Alignment Session](sessions/2025-12-20_scribe_mvp_ssot_alignment.md)
+
+**Service Details:**
+- **Platform:** Google Cloud Run (us-central1)
+- **Current Revision:** github-webhook-receiver-00009-lfb
+- **Traffic:** 100% to 00009-lfb (deployed 2025-12-20 17:18 UTC)
+- **Service URL:** https://github-webhook-receiver-u7gbgdjoja-uc.a.run.app/webhook
+- **Build Commit:** dcb7682 (verified identical to main branch b07d1bb)
+
+**Features Deployed:**
+- ✅ GitHub webhook signature verification (HMAC-SHA256)
+- ✅ Fast-ACK response (HTTP 202 within 10s)
+- ✅ Firestore idempotency (24h deduplication)
+- ✅ Command parsing MVP: `/label` and `/assign` commands
+- ✅ Bot filtering (ignores bot-generated comments)
+- ✅ GitHub API integration (labels, assignees)
+
+**Deployment Strategy:**
+- **Method:** Canary deployment (progressive rollout)
+- **Phase 1:** 10% traffic (validation)
+- **Phase 2:** 100% traffic (full rollout)
+- **Verification:** Multi-gate validation (traffic state, error logs, real webhook test)
+- **Downtime:** Zero
+- **Rollback Capability:** Preserved (previous revision 00008-x56 available)
+
+**Verification Results:**
+- ✅ Traffic routing: 100% → 00009-lfb confirmed
+- ✅ Error scan: Zero ERROR logs (30-minute window)
+- ✅ Real webhook test: `/label bug` executed successfully
+- ✅ GitHub API: Label added to issue #18
+- ✅ Bot filtering: Correctly ignored bot comment
+- ✅ HTTP responses: 202 Accepted (latency 0.05s - 1.4s)
+
+**Previous Revisions:**
+- 00008-x56: ACK responder only (no command parsing)
+- 00009-lfb: Command parsing MVP (current)
+
+**Rollback Procedure:**
+```bash
+# Immediate rollback to previous stable revision
+gcloud run services update-traffic github-webhook-receiver \
+  --region us-central1 --project project-38-ai \
+  --to-revisions github-webhook-receiver-00008-x56=100
+```
+
+**Next Steps:**
+- [ ] Monitor logs for 24h (anomaly detection)
+- [ ] Expand command repertoire (additional IssueOps commands)
+- [ ] Optional: Remove "canary" tag (cosmetic cleanup)
+
+**Action Required:** None — Command parsing MVP operational in production
 
 ---
 
@@ -394,6 +453,7 @@
 | 2025-12-15 | Drive deprecated; SSOT moved to repo; Evidence external with manifest+hashes | **Drift Prevention:** Eliminate sync lag between Drive and repo. **Git-Native Workflow:** All state/decisions tracked in Git for full audit trail and easy rollback. **Evidence Integrity:** SHA256 hashes in manifest verify artifact authenticity without committing large files. **Session Continuity:** New sessions start from repo state via `session_start_packet.md`, not memory or Drive paste. **External Evidence Store:** Large artifacts (logs, screenshots, binaries) stored at `<EVIDENCE_STORE_PATH>\` and referenced via `docs/evidence/manifest.md` with SHA256 verification. | Repo = SSOT (`docs/context/` files + traceability matrix). Drive = DEPRECATED. Evidence store = external (not committed). Manifest = integrity bridge (SHA256 hashes). Session start = `session_start_packet.md` template. No Drive sync needed. |
 | 2025-12-16 | Security-reviewed deployment scripts committed | 4 automation scripts added to repo with full security review: **deployment/scripts/fetch_secrets.sh** (SECRET_FETCHER with parameterized PROJECT_ID + all 7 secrets), **deployment/archive/startup.sh** (VM bootstrap with auto-detected user), **p38_sync_secrets.ps1** (PowerShell secret sync), **gpt_google_workspace_schema.yaml** (OpenAPI schema with URL placeholder). All hardcoded secrets/URLs removed. Pre-commit scanning performed. | Scripts ready for Phase 2 deployment. All secrets injected at runtime from Secret Manager (zero hardcoded values). |
 | 2025-12-18 | Created GitHub App (project-38-scribe) | **Granular Automation:** Actions/Contents/Workflows R/W only (least privilege). **Repository-Scoped:** Limited to project-38 (isolated from other repos). **Auditability:** All actions attributed to "project-38-scribe[bot]" (clear audit trail). **Revocable:** Can uninstall without affecting other tools. **No Webhook:** Disabled (no stable HTTPS endpoint yet, can add later). | GitHub App ready for automation: documentation updates, workflow dispatch, CI/CD orchestration. Private key stored at `<LOCAL_PEM_PATH>/project-38-scribe.2025-12-18.private-key.pem` (outside repo). Documentation in `docs/github-app/`. |
+| 2025-12-20 | Canary deployment for Command Parsing MVP | **Progressive Rollout:** 10% → 100% traffic migration minimizes blast radius. **Multi-Gate Validation:** Traffic state + error logs + real webhook test at each phase. **Zero Downtime:** Traffic routing without service interruption. **Rollback Capability:** Previous revision preserved for instant rollback. **Real-World Testing:** Live GitHub webhook verification before full deployment. | Command parsing MVP (/label, /assign) deployed to production via Cloud Run revision 00009-lfb. Zero errors detected. Rollback procedure documented. Session brief in `docs/sessions/2025-12-20_canary_deployment_100pct_rollout.md`. |
 
 ---
 

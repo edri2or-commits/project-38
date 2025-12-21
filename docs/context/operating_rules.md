@@ -706,6 +706,97 @@ Get-ChildItem -Path docs -Recurse -Filter *.md |
 
 ---
 
+## Rule 14: Doc-sprawl Gate (HARD RULE)
+
+### No New Files Without Registry
+
+**Every new documentation file MUST:**
+
+1. ✅ Check if existing file can hold the content
+2. ✅ Update `docs/_system/_registry.yml` BEFORE creation
+3. ✅ Update `docs/_system/SYSTEM_MAP.md` if structural change
+4. ✅ Comment in Control Room Issue (#24) if decision-related
+
+**Forbidden:**
+❌ Create "orphan" docs (files not linked from SYSTEM_MAP or registry)  
+❌ Duplicate content across multiple files  
+❌ Create temporary docs in `docs/` (use `/tmp/` instead)
+
+**Registry Structure:**
+```yaml
+canon_files:
+  - path: docs/context/new_file.md
+    purpose: Brief description
+    created: YYYY-MM-DD
+    category: canon|secondary|evidence
+```
+
+**Enforcement:**
+- Claude asks: "Does existing file exist for this?" before creating
+- Claude updates registry entry BEFORE file creation
+- Claude comments in Issue #24 if decision doc
+
+**Evidence:** See `docs/_system/_registry.yml` for file inventory
+
+---
+
+## Rule 15: Control Room Authority (SSOT)
+
+### Issue #24 = State Authority
+
+**Authority Hierarchy:**
+
+1. **PRIMARY (State Authority):**  
+   - **Control Room Issue #24** ← All decisions, gates, deployments tracked here
+   - Link: https://github.com/edri2or-commits/project-38/issues/24
+
+2. **NAVIGATION (Map):**  
+   - **SYSTEM_MAP.md** ← Complete navigation hub
+   - Link: docs/_system/SYSTEM_MAP.md
+
+3. **SNAPSHOTS (Derived):**  
+   - phase_status.md ← Current phase/slice/gates
+   - traceability_matrix.md ← Component status dashboard
+   - README.md ← Quick reference
+   - PROJECT_NARRATIVE.md ← Strategic context
+
+**Rule:** If Control Room Issue #24 says one thing and other docs say another → **Issue #24 wins.**
+
+### Protocol (5 מצוות)
+
+**ALWAYS post to Control Room Issue (#24) for:**
+
+1. ✅ **Strategic decisions** (architecture, approach, direction)
+2. ✅ **Gate closures** (with evidence link)
+3. ✅ **Deployments** (before: plan, after: evidence)
+4. ✅ **New documentation** (why created, where located)
+5. ❌ **No scattered chats** (single conversation thread)
+
+**Example Comment Structure:**
+```markdown
+## [Action Type] - [Brief Title]
+
+**What:** [1-2 sentence description]
+**Why:** [Rationale]
+**Evidence:** [Link to docs/evidence/YYYY-MM-DD_*.txt]
+**Impact:** [What this changes]
+
+[Additional details if needed]
+```
+
+**Benefits:**
+- ✅ Single source of decisions (no searching)
+- ✅ GitHub notifications (mobile-friendly)
+- ✅ Audit trail (GitHub timestamps + user attribution)
+- ✅ "Chat אחד" protocol ready (Stage 1: manual sync)
+
+**Claude's Responsibility:**
+- Post summaries to #24 after significant actions
+- Link evidence files from #24 comments
+- Keep #24 current (latest status always visible)
+
+---
+
 ## Summary: Top 10 Don'ts
 
 1. ❌ Execute new build/deploy without explicit user instruction (Slice 1 DONE, Slice 2A awaiting approval)

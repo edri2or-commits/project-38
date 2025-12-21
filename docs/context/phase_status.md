@@ -1,6 +1,58 @@
 # Phase Status — Project 38 (V2)
 
-**Last Updated:** 2025-12-17 (Local Environment Secret Fix)
+**Last Updated:** 2025-12-21 (Control Room Established + Gate A Closure)
+
+**Control Room:** [Issue #24](https://github.com/edri2or-commits/project-38/issues/24) — All decisions/gates/deployments posted there
+
+---
+
+## ✅ RESOLVED: Observability Guardrails - Gate A CLOSED (2025-12-21)
+
+### Status: PRODUCTION VERIFIED
+**Sessions:** 
+- [E2E Alert Test](../sessions/2025-12-20_e2e_alert_test.md)
+- [Gate Closure Investigation](../sessions/2025-12-21_gate_closure_investigation.md)
+
+**Objective:** Verify end-to-end alert delivery to notification channel
+
+**Gate A: Notification Channel Verification**
+- **Status:** ✅ CLOSED
+- **Channel ID:** 10887559702060583593
+- **Email:** edri2or@gmail.com
+- **Type:** email
+- **verificationStatus:** VERIFIED (was: null)
+- **enabled:** true
+
+**Verification Method:**
+```
+POST /v3/projects/project-38-ai/notificationChannels/10887559702060583593:sendVerificationCode
+→ Email received: G-851889
+POST /v3/projects/project-38-ai/notificationChannels/10887559702060583593:verify
+→ Response: {"verificationStatus": "VERIFIED"}
+```
+
+**Gate B: Log Format Compatibility**
+- **Status:** ✅ CLOSED (verified 2025-12-20)
+- **Format:** textPayload (matches metric filters)
+- **Metrics:**
+  - webhook_5xx_errors
+  - webhook_command_errors
+
+**Current Alert Policies (3):**
+```
+17939154262393650707 → Webhook High 5xx Error Rate       [ENABLED]
+3749356261847228670  → Webhook Command Execution Errors  [ENABLED]
+9334277562526392075  → Webhook High Request Latency      [ENABLED]
+```
+
+**Technical Notes:**
+- Windows-MCP Powershell-Tool has CLIXML output issue (gcloud commands return empty)
+- Workaround: Desktop Commander MCP for process execution
+- Token retrieval: `gcloud auth print-access-token` works via Desktop Commander
+
+**Evidence:** 
+- File: docs/evidence/2025-12-21_notification_channel_verification.txt
+- Contains: API requests/responses, verification code, channel status
 
 ---
 
@@ -75,7 +127,7 @@
 
 ## Current Phase: PHASE 2 - WORKLOAD DEPLOYMENT
 
-**Status:** Slice 2A ✅ | POC-01 ✅ | POC-02 ✅ | POC-03 ⏸️ (Activation Required)
+**Status:** Slice 2A ✅ | POC-01 ✅ | POC-02 ✅ | POC-03 ⏸️ (Activation Required) | Observability ✅
 
 **Mode:** DEV environment operational
 
@@ -125,6 +177,21 @@
 - N8N + PostgreSQL running
 - SSH tunnel access (localhost:5678)
 - Security: localhost-only binding
+
+#### Observability Guardrails (✅ DONE — 2025-12-21)
+**Evidence:** [docs/evidence/2025-12-21_notification_channel_verification.txt](../evidence/2025-12-21_notification_channel_verification.txt)
+
+**Deployed:**
+- ✅ Logs-based metrics (2):
+  - webhook_5xx_errors
+  - webhook_command_errors
+- ✅ Alert policies (3):
+  - Webhook High 5xx Error Rate
+  - Webhook Command Execution Errors
+  - Webhook High Request Latency
+- ✅ Notification channel: VERIFIED (email delivery E2E confirmed)
+
+**Status:** Production-ready observability for github-webhook-receiver
 
 #### POC-01: Headless Activation + Hardening (✅ PASS — 2025-12-16)
 **Evidence:** [docs/phase-2/poc-01_headless_hardening.md](../phase-2/poc-01_headless_hardening.md)
@@ -217,6 +284,7 @@
 ✅ DONE    → PRE-BUILD (GCP + Secrets + IAM)
 ✅ DONE    → Slice 1: DEV VM Baseline
 ✅ DONE    → Slice 2A: N8N Deployment
+✅ DONE    → Observability Guardrails
 ✅ PASS    → POC-01: Headless Activation + Hardening
 ✅ PASS    → POC-02: Telegram Webhook Integration
 📋 NEXT    → POC-03: Full Conversation Flow
@@ -233,9 +301,10 @@
 - ✅ N8N: Running with hardening
 - ✅ PostgreSQL: Running
 - ✅ Telegram Webhook: Configured (temp tunnel)
+- ✅ Observability: Metrics + Alerts + Verified notification channel
 - ❌ Kernel: Not deployed
 - ❌ Production HTTPS: Not configured
 
 ---
 
-**Current Status:** POC-02 PASS ✅ | Secrets PRODUCTION READY ✅ | Ready for POC-03 or Kernel deployment
+**Current Status:** Observability ✅ | POC-02 PASS ✅ | Secrets PRODUCTION READY ✅ | Ready for POC-03 or Kernel deployment
