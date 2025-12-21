@@ -1,207 +1,157 @@
-# Traceability Matrix — Project 38 (V2)
-
-**Last Updated:** 2025-12-21 (Stage 2A: Echo Bot via GitHub Actions)  
-**Purpose:** Track completion status and evidence for all project components
-
 ---
 
-## Legend
+## Detailed Status: Stage 2B - LLM Integration via OIDC/WIF
 
-| Status | Meaning |
-|--------|---------|
-| ✅ DONE | Completed and verified with evidence |
-| 🔄 IN PROGRESS | Currently being worked on |
-| 📋 NEXT | Queued for execution (not started) |
-| ⏸️ DEFERRED | Postponed to later phase |
-| ❌ BLOCKED | Cannot proceed (dependencies not met) |
+### Status: ✅ DONE (Gate 2B CLOSED - 2025-12-21)
 
----
-
-## Component Status Table
-
-| Component | Status | Phase | Evidence | Notes |
-|-----------|--------|-------|----------|-------|
-| **Secrets (GCP Secret Manager)** | ✅ DONE | PRE-BUILD | SYNC_OK / FINAL_OK | 7 secrets × 2 projects, 2 ENABLED versions each |
-| **IAM (Service Accounts)** | ✅ DONE | PRE-BUILD | IAM_OK | 3 SA per project + least privilege matrix |
-| **Context Documentation** | ✅ DONE | PRE-BUILD | Files in docs/context/ | 4 canonical files created |
-| **GitHub App (project-38-scribe)** | ✅ DONE | Infrastructure | [GitHub App Docs](github-app/) | Created 2025-12-18 • Actions/Contents/Workflows R/W |
-| **GitHub Webhook Receiver** | ✅ DONE | Infrastructure | [Session Brief](sessions/2025-12-20_canary_deployment_100pct_rollout.md) | Cloud Run (us-central1) • Revision 00009-lfb • Command Parsing MVP (/label, /assign) • Deployed 2025-12-20 |
-| **Stage 2A: Echo Bot** | ✅ DONE | IssueOps | [Evidence](evidence/2025-12-21_stage_2a_echo_bot_e2e.txt) • [Issue #24](https://github.com/edri2or-commits/project-38/issues/24#issuecomment-3679601920) | GitHub Actions workflow • Gate 2A CLOSED • E2E loop verified • Deployed 2025-12-21 |
-| **Strategic Narrative (PROJECT_NARRATIVE.md)** | ✅ DONE | Phase 1 | Root file | Entry point document with "why" and "how" (2025-12-16) |
-| **Deployment Scripts** | ✅ DONE | Phase 2 | Root scripts | 4 automation scripts: deployment/scripts/fetch_secrets.sh, deployment/archive/startup.sh, p38_sync_secrets.ps1, gpt_google_workspace_schema.yaml (2025-12-16, commit c70a8a1) |
-| **Infrastructure (Slice 1 - VM Baseline)** | ✅ DONE | Slice 1 | [Execution Log](phase-2/slice-01_execution_log.md) | Completed 2025-12-15 • VM + Docker + IAM verified |
-| **Advanced Infrastructure (Cloud SQL, NAT, VPC)** | ⏸️ OPTIONAL/DEFERRED | Phase 2B/3 | N/A | Only if scaling/managed DB required |
-| **Workload Deployment (Slice 2A - N8N)** | ✅ DONE | Slice 2A | [Execution Log](phase-2/slice-02a_execution_log.md) | Completed 2025-12-16 • N8N + Postgres deployed (72 min) |
-| **POC-01: Headless Activation + Hardening** | ✅ PASS | Phase 2 | [POC-01 Doc](phase-2/poc-01_headless_hardening.md) | Completed 2025-12-16 • Headless workflow activation verified |
-| **POC-02: Telegram Webhook Integration** | ✅ PASS | Phase 2 | [POC-02 Doc](phase-2/poc-02_telegram_webhook.md) | Completed 2025-12-16 • Telegram webhook + dedup verified |
-| **POC-03: Full Conversation Flow** | ⏸️ BLOCKED | Phase 2 | [POC-03 Issues](sessions/2025-12-17_poc03_issues.md) | Workflows imported, activation blocked (credentials + webhook registration) |
-| **Workload Deployment (Slice 2B/3 - Kernel)** | ⏸️ DEFERRED | Slice 2B/3 | Pending | Kernel service - SA architecture TBD |
-| **Testing & Validation (Slice 3)** | 📋 NEXT | Slice 3 | Pending | DEV environment validation |
-| **PROD Mirror (Slice 4)** | ⏸️ DEFERRED | Slice 4 | Pending | After DEV approval |
-
----
-
-## Detailed Status: Secrets
-
-### Status: ✅ DONE (FINAL_OK)
-
-**Evidence:**
-- **DEV (project-38-ai):** 7 secrets, each with 2 ENABLED versions
-- **PROD (project-38-ai-prod):** 7 secrets, each with 2 ENABLED versions
-- **Verification:** Metadata checks performed, no values exposed
-- **Documentation:** `secret_sync_history.md` contains full inventory
-
-**Secret List:**
-1. anthropic-api-key ✅
-2. gemini-api-key ✅
-3. github-pat ✅
-4. n8n-encryption-key ✅
-5. openai-api-key ✅
-6. postgres-password ✅
-7. telegram-bot-token ✅
-
-**Action Required:** None — secrets are ready for use
-
----
-
-## Detailed Status: IAM
-
-### Status: ✅ DONE (IAM_OK)
-
-**Evidence:**
-- **DEV:** 3 service accounts with least privilege access ✅
-- **PROD:** 3 service accounts with least privilege access ✅
-- **Access Matrix:** Documented in `secret_sync_history.md`
-
-**Service Accounts per Project:**
-1. github-actions-deployer → All 7 secrets ✅
-2. n8n-runtime → 3 secrets (n8n-encryption-key, postgres-password, telegram-bot-token) ✅
-3. kernel-runtime → 4 secrets (LLM APIs + github-pat) + 2 project roles ✅
-
-**kernel-runtime Additional Roles:**
-- roles/logging.logWriter ✅
-- roles/compute.viewer ✅
-
-**Action Required:** None — IAM is ready for use
-
----
-
-## Detailed Status: GitHub App (project-38-scribe)
-
-### Status: ✅ DONE (Created 2025-12-18)
-
+**Execution Status:** ✅ COMPLETE  
 **Documentation:**
-- [GitHub App Overview](github-app/README.md)
-- [Setup Guide](github-app/setup.md)
-- [Permissions Matrix](github-app/permissions.md)
-- [Usage Examples](github-app/usage.md)
+- [Evidence File](evidence/2025-12-21_stage_2b_llm_e2e.txt)
+- [Control Room Comment](https://github.com/edri2or-commits/project-38/issues/24#issuecomment-3679664969)
 
-**App Details:**
-- **Name:** project-38-scribe
-- **Created:** 2025-12-18
-- **Homepage:** https://github.com/edri2or-commits/project-38
-- **Installed On:** edri2or-commits/project-38
-- **Private Key:** `<LOCAL_PEM_PATH>/project-38-scribe.2025-12-18.private-key.pem`
+**Objective:** LLM-powered IssueOps with OIDC/WIF security (zero GitHub Secrets)
 
-**Permissions (Repository-level):**
-- ✅ Actions: Read and write
-- ✅ Contents: Read and write
-- ✅ Workflows: Read and write
-- ✅ Metadata: Read-only (automatic)
+**Implementation:**
+- **Approach:** GitHub Actions + OIDC to GCP Secret Manager
+- **Workflow:** `.github/workflows/llm-bot-stage2b.yml`
+- **PR:** #30 (Squash merged)
+- **Commit:** c6b79d4
+- **Deployment:** Merged to main 2025-12-21
 
-**Webhook Configuration:**
-- Status: ✅ ACTIVE (configured and verified in production)
-- URL: https://github-webhook-receiver-u7gbgdjoja-uc.a.run.app/webhook
-- Features: Signature verification (HMAC-SHA256), Firestore idempotency, Fast-ACK (202), Command Parsing (/label, /assign)
-- Deployment: Cloud Run (us-central1), revision github-webhook-receiver-00009-lfb (deployed 2025-12-20)
-- Ref: PR #17 (Command Parsing MVP)
+**Security Architecture:**
+1. **OIDC/WIF Authentication:**
+   - Workload Identity Pool: github-actions-pool
+   - Provider: github-actions-provider
+   - Service Account: github-actions-llm@project-38-ai.iam.gserviceaccount.com
+   - Short-lived credentials (no static secrets)
+   - Attribute Condition: repository == 'edri2or-commits/project-38'
 
-**Installation Scope:**
-- Account: edri2or-commits only
-- Repository: project-38 only
-- Cannot access other repositories or organizations
+2. **Secret Manager Access:**
+   - OPENAI_API_KEY: project-38-ai/openai-api-key
+   - ANTHROPIC_API_KEY: project-38-ai/anthropic-api-key
+   - GEMINI_API_KEY: project-38-ai/gemini-api-key
+   - Runtime retrieval (not stored in GitHub)
+   - IAM Role: roles/secretmanager.secretAccessor
 
-**Use Cases:**
-- Automated documentation updates
-- Workflow management and dispatch
-- CI/CD orchestration
-- Release automation
+3. **Command Injection Prevention:**
+   - Line 51: `BODY=$(jq -r '.comment.body' "$GITHUB_EVENT_PATH")`
+   - Line 126: Python `json.load(GITHUB_EVENT_PATH)`
+   - ✅ NO heredoc with untrusted input
+   - ✅ NO bash string interpolation of user content
 
-**Security Features:**
-- Granular permissions (Actions/Contents/Workflows only)
-- Repository-scoped (isolated to project-38)
-- Auditable (all actions attributed to "project-38-scribe[bot]")
-- Revocable (can uninstall without affecting other tools)
+4. **Access Control:**
+   - Lines 28-44: author_association check
+   - Allowed: OWNER, MEMBER only
+   - Blocked: CONTRIBUTOR, FIRST_TIME_CONTRIBUTOR, NONE
+   - ✅ Public repo protection (cost abuse prevention)
 
-**Next Steps:**
-- [ ] Test App permissions (create test commit)
-- [ ] Document usage patterns in automation
-- [ ] Create example scripts using the App
-- [ ] Set up monitoring for API rate limits
+**Guard Order (3 gates):**
+1. **Bot Guard:** Skip Bot users (prevent loops)
+2. **Access Control:** OWNER/MEMBER only (NEW in Stage 2B)
+3. **Command Guard:** /ask or /plan only
 
-**Action Required:** None — App is ready for use in automation
+**Permissions:**
+- `id-token: write` (OIDC to GCP)
+- `issues: write` (Post comments)
+- `contents: read` (Checkout repo)
+
+**Trigger:**
+- Event: `issue_comment.created`
+- Scope: Issue #24 only
+- Commands: `/ask` or `/plan`
+
+**Gate 2B Verification:**
+- **Test Command:** Comment #3679660658
+  - User: edri2or-commits
+  - Body: `/ask What is the current phase status?`
+  
+- **LLM Response:** Comment #3679660787
+  - User: github-actions[bot]
+  - Model: claude-sonnet-4-20250514
+  - Max Tokens: 1000
+  
+- **Workflow Run:** https://github.com/edri2or-commits/project-38/actions/runs/20417158558
+  - Status: success
+  - Duration: ~30 seconds
+  
+- **OIDC Authentication:** ✅ VERIFIED
+  - Credentials file: /home/runner/work/project-38/project-38/gha-creds-a8938b6414bb8e01.json
+  - Project: project-38-ai
+  
+- **Secret Access:** ✅ VERIFIED
+  - All 3 API keys retrieved from Secret Manager
+  - Secrets properly masked in logs (*** format)
+  - No secret values exposed
+
+**Context Loading:**
+- docs/_system/SYSTEM_MAP.md (2000 chars truncated)
+- docs/context/phase_status.md (2000 chars truncated)
+- Loaded into system prompt for LLM
+
+**LLM Configuration:**
+- Provider: Anthropic
+- Model: claude-sonnet-4-20250514
+- Max Tokens: 1000
+- API Version: 2023-06-01
+- System Prompt: Project 38 IssueOps assistant (with SSOT context)
+
+**Response Format:**
+```markdown
+🤖 **LLM Response** (Claude Sonnet 4)
+
+{response_text}
 
 ---
-
-## Detailed Status: GitHub Webhook Receiver
-
-### Status: ✅ DONE (Command Parsing MVP Deployed 2025-12-20)
-
-**Documentation:**
-- [Deployment Session Brief](sessions/2025-12-20_canary_deployment_100pct_rollout.md)
-- [SSOT Alignment Session](sessions/2025-12-20_scribe_mvp_ssot_alignment.md)
-
-**Service Details:**
-- **Platform:** Google Cloud Run (us-central1)
-- **Current Revision:** github-webhook-receiver-00009-lfb
-- **Traffic:** 100% to 00009-lfb (deployed 2025-12-20 17:18 UTC)
-- **Service URL:** https://github-webhook-receiver-u7gbgdjoja-uc.a.run.app/webhook
-- **Build Commit:** dcb7682 (verified identical to main branch b07d1bb)
-
-**Features Deployed:**
-- ✅ GitHub webhook signature verification (HMAC-SHA256)
-- ✅ Fast-ACK response (HTTP 202 within 10s)
-- ✅ Firestore idempotency (24h deduplication)
-- ✅ Command parsing MVP: `/label` and `/assign` commands
-- ✅ Bot filtering (ignores bot-generated comments)
-- ✅ GitHub API integration (labels, assignees)
-
-**Deployment Strategy:**
-- **Method:** Canary deployment (progressive rollout)
-- **Phase 1:** 10% traffic (validation)
-- **Phase 2:** 100% traffic (full rollout)
-- **Verification:** Multi-gate validation (traffic state, error logs, real webhook test)
-- **Downtime:** Zero
-- **Rollback Capability:** Preserved (previous revision 00008-x56 available)
-
-**Verification Results:**
-- ✅ Traffic routing: 100% → 00009-lfb confirmed
-- ✅ Error scan: Zero ERROR logs (30-minute window)
-- ✅ Real webhook test: `/label bug` executed successfully
-- ✅ GitHub API: Label added to issue #18
-- ✅ Bot filtering: Correctly ignored bot comment
-- ✅ HTTP responses: 202 Accepted (latency 0.05s - 1.4s)
-
-**Previous Revisions:**
-- 00008-x56: ACK responder only (no command parsing)
-- 00009-lfb: Command parsing MVP (current)
-
-**Rollback Procedure:**
-```bash
-# Immediate rollback to previous stable revision
-gcloud run services update-traffic github-webhook-receiver \
-  --region us-central1 --project project-38-ai \
-  --to-revisions github-webhook-receiver-00008-x56=100
+*Command: `/ask`*
+*Model: claude-sonnet-4-20250514*
+<!-- P38_LLM_RESPONSE -->
 ```
 
+**Verification Results:**
+- ✅ Bot Guard: Echo Bot ACK (#3679660747) did NOT trigger LLM workflow
+- ✅ Access Control: OWNER permission verified for edri2or-commits
+- ✅ Command Guard: /ask command detected and processed
+- ✅ OIDC Auth: Short-lived token obtained successfully
+- ✅ Secret Manager: All 3 keys retrieved without errors
+- ✅ Secrets Masking: Verified in workflow logs
+- ✅ LLM API Call: Anthropic API responded successfully
+- ✅ Response Posted: Comment created in Issue #24
+- ✅ Loop Prevention: LLM response did not trigger new workflow run
+
+**Security Validation:**
+- ❌ NO command injection vectors found
+- ❌ NO heredoc with untrusted input
+- ❌ NO GitHub Secrets used (100% runtime secret access)
+- ✅ GITHUB_EVENT_PATH used for all user input
+- ✅ Access control enforced at workflow level
+- ✅ Secrets never logged or exposed
+
+**Evidence:**
+- Full E2E test log: [2025-12-21_stage_2b_llm_e2e.txt](evidence/2025-12-21_stage_2b_llm_e2e.txt)
+- SHA256: A667006885C6744F1B0169EA9C3A222D8CD8F0E72A2C3481DDDC2ECFE40A05FF
+- Verification checklist: All items ✅
+- Zero security exceptions in logs
+
+**Comparison: Stage 2A vs 2B:**
+| Feature | Stage 2A (Echo Bot) | Stage 2B (LLM Integration) |
+|---------|---------------------|----------------------------|
+| Authentication | GITHUB_TOKEN only | GITHUB_TOKEN + OIDC to GCP |
+| Secrets | None | 3 from Secret Manager |
+| Guards | 3 (Issue, Bot, Echo Marker) | 3 (Bot, Access, Command) |
+| Complexity | Low (Echo ACK) | High (LLM API + Context) |
+| Security Risk | Low | Medium (mitigated) |
+| Access Control | None (any commenter) | OWNER/MEMBER only |
+
+**Gate 2B Status:** ✅ CLOSED
+- Deployed: 2025-12-21T23:05:36Z (merge)
+- Verified: 2025-12-21T23:06:07Z (E2E test)
+- Evidence: docs/evidence/2025-12-21_stage_2b_llm_e2e.txt
+
 **Next Steps:**
-- [ ] Monitor logs for 24h (anomaly detection)
-- [ ] Expand command repertoire (additional IssueOps commands)
-- [ ] Optional: Remove "canary" tag (cosmetic cleanup)
+- Ready for POC-03: Full Conversation Flow
+- OR: Expand LLM capabilities (additional commands, context sources)
 
-**Action Required:** None — Command parsing MVP operational in production
-
----
+**Action Required:** None — LLM integration operational in production
 
 ## Detailed Status: Infrastructure (Slice 1 - VM Baseline)
 
