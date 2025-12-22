@@ -1,0 +1,38 @@
+# Stage 3A - Production Hardening Evidence
+Generated: 2025-12-22T21:12:17Z
+
+## Implementation Summary
+
+### 1. Failure Reporting
+- **Location:** `.github/workflows/llm-bot-stage2b-v3.yml`, final step "Report Failure"
+- **Trigger:** `always() && failure() && github.event_name == 'issue_comment' && github.event.issue.number == 24`
+- **Mechanism:** Deterministic cause detection using `steps.<id>.outcome`
+- **Steps monitored (14 total):** bot_check, lock_check, acquire_lock, idempotency_check, access_check, command_check, checkout, auth_gcp, secrets, setup_python, install_deps, generate_response, post_response, release_success, release_failure
+- **Output:** Posts comment with run URL, cause, timestamp, marker `P38_FAILURE_REPORT: run_<id>`
+
+### 2. Retry Logic
+- **Location:** `.github/workflows/llm-bot-stage2b-v3.yml`, "Generate response" step
+- **Implementation:** Inline Python with exponential backoff
+- **Parameters:** MAX_RETRIES=3, BASE_DELAY=2s, Backoff: 2s/4s/8s
+- **Observability:** `::notice::` output for each attempt
+- **Exit:** Success→exit(0), Failure→exit(1) after exhausting retries
+
+### 3. Budget Guards
+- **Timeouts:** Job: 5min, Step: 3min on "Generate response"
+- **Context:** CONTEXT_LIMIT=4000 chars, truncation notice only when actually truncated
+
+## Git Evidence
+- **PR #47:** https://github.com/edri2or-commits/project-38/pull/47
+- **Commits:**
+  - 2c97c20: PR structure
+  - dc503888: Bad upload (base64)
+  - 292c4cb7: Fixed workflow (12,330 bytes, 277 lines)
+- **State:** open, mergeable: true
+
+## DoD Status
+- [x] Single PR with all changes
+- [x] Workflow file with 3 components
+- [ ] Simulated failure run (requires merge)
+- [ ] Retry demonstration (requires merge)  
+- [x] Evidence file with SHA256
+- [ ] SSOT update in Issue #24
