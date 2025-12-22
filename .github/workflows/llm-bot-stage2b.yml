@@ -45,7 +45,7 @@ jobs:
             echo "skip=false" >> $GITHUB_OUTPUT
           fi
       
-      - name: Access Control - REST API check
+      - name: Access Control - REST API only
         id: access_check
         if: steps.bot_check.outputs.skip == 'false' && steps.idempotency_check.outputs.skip == 'false'
         env:
