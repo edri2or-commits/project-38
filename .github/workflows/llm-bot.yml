@@ -1,8 +1,15 @@
-name: LLM Bot - Stage 2B
+name: LLM Bot - Legacy (Manual Only)
 
 on:
-  issue_comment:
-    types: [created]
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: 'Issue number to respond to'
+        required: true
+        default: '24'
+      comment_body:
+        description: 'Comment text (/ask or /plan command)'
+        required: true
 
 # Required for OIDC to GCP
 permissions:
