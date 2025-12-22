@@ -55,12 +55,16 @@
 ---
 ## Architecture Decision Records (Permanent)
 
-# Pattern: docs/adr/ADR-NNN_<title>.md
+# Pattern: docs/decisions/adr-NNN-<title>.md
 # Purpose: Record architectural decisions with context, options, rationale
 # Retention: permanent
-# Naming: ADR-001_title-with-hyphens.md
+# Naming: adr-001-title-with-hyphens.md
 
-# (empty - no ADRs created yet)
+- path: docs/decisions/adr-001-actions-vs-cloud-run.md
+  purpose: Stage 2C - Why GitHub Actions (MVP) vs Cloud Run (scale)
+  maintainer: Claude
+  status: active
+  created: 2025-12-22
 
 ---
 ## Session Summaries (Historical)
