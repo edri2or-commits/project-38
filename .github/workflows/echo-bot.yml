@@ -6,8 +6,8 @@ on:
 
 jobs:
   echo:
-    # Only run on Issue #24 (Control Room)
-    if: github.event.issue.number == 24
+    # Only run on Issue #24 (Control Room) AND skip commands (starting with /)
+    if: ${{ github.event.issue.number == 24 && !startsWith(github.event.comment.body, '/') }}
     runs-on: ubuntu-latest
     
     permissions:
