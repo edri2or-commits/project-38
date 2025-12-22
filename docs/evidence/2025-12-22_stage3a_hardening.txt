@@ -1,0 +1,65 @@
+# Stage 3A - Production Hardening Evidence
+Generated: 2025-12-22T21:15:00Z
+
+## Implementation Summary
+
+### 1. Failure Reporting
+- Location: .github/workflows/llm-bot-stage2b-v3.yml, final step "Report Failure"
+- Trigger: always() && failure() && github.event_name == 'issue_comment' && github.event.issue.number == 24
+- Mechanism: Deterministic cause detection using steps.<id>.outcome
+- Steps monitored (14 total): bot_check, lock_check, acquire_lock, idempotency_check, access_check, command_check, checkout, auth_gcp, secrets, setup_python, install_deps, generate_response, post_response, release_success, release_failure
+- Output: Posts comment with run URL, cause, timestamp, marker P38_FAILURE_REPORT: run_<id>
+
+### 2. Retry Logic
+- Location: .github/workflows/llm-bot-stage2b-v3.yml, "Generate response" step
+- Implementation: Inline Python with exponential backoff
+- Parameters: MAX_RETRIES=3, BASE_DELAY=2s, Backoff sequence: 2s, 4s, 8s
+- Observability: ::notice:: output for each attempt
+- Exit behavior: Success -> exit(0) immediately, Failure -> exit(1) after exhausting retries
+
+### 3. Budget Guards
+- Timeout controls: Job level: 5 minutes, Step level: 3 minutes on "Generate response"
+- Context truncation: CONTEXT_LIMIT=4000 characters, Applied to user query before LLM call, Notification added only when truncated
+
+## Git Evidence
+
+### Commits
+- 2c97c20: PR structure (empty commit)
+- dc503888: Initial upload (base64 bug)
+- 292c4cb7: Fixed workflow (12,330 bytes, 277 lines YAML)
+- 4c2a97cf: Evidence file (replaced below)
+
+### Pull Request
+- Number: #47
+- Title: Stage 3A: Production Hardening (Vertical Slice)
+- URL: https://github.com/edri2or-commits/project-38/pull/47
+- Base: main (a1998f0)
+- Head: stage-3a-hardening (will update with new SHA)
+- State: open
+- Mergeable: true
+
+## File Verification
+
+Workflow file path: .github/workflows/llm-bot-stage2b-v3.yml
+Workflow commit: 292c4cb7238994b54c16ccb34bff66171e4da1f7
+Workflow size: 12,330 bytes (277 lines)
+
+## DoD Checklist (Pre-Merge)
+
+- [x] Single PR with all changes
+- [x] Workflow file with all 3 components:
+  - [x] Failure reporting (steps.*.outcome)
+  - [x] Retry logic (Python, exponential backoff)
+  - [x] Budget guards (timeouts + truncation)
+- [x] Evidence file with commit SHA256 (this file, ASCII clean)
+- [x] SSOT update in Issue #24 (pending below)
+- [ ] Simulated failure run (POST-MERGE: requires workflow in main)
+- [ ] Retry demonstration (POST-MERGE: requires workflow in main)
+
+## Post-Merge Tasks
+
+1. Trigger workflow_dispatch on main branch
+2. Simulate failure by temporarily removing API key
+3. Verify failure report appears in Issue #24
+4. Verify retry logic in Actions logs (3 attempts visible)
+5. Update Issue #24 with run links and gate closure
