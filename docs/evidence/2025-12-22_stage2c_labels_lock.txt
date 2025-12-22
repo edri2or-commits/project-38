@@ -1,0 +1,111 @@
+# Stage 2C: Label-Based Concurrency Lock - Evidence
+
+## Gate: Stage 2C Complete
+**Date:** 2025-12-22
+**Rule:** Rule 16 (Label-based state machine)
+
+---
+
+## 1. PR + Commit
+
+**PR #44:** https://github.com/edri2or-commits/project-38/pull/44
+**Commit:** 65bec24de5a891fa5da448e63f36d4ada3edcf27
+**Merge SHA:** 7ce07f1da525c80de696e935538f8226edfdf34a
+**Merged:** 2025-12-22 19:15:38 UTC
+
+---
+
+## 2. Workflow Verification
+
+### workflow_dispatch Test:
+- Run: https://github.com/edri2or-commits/project-38/actions/runs/20441633712
+- Event: workflow_dispatch
+- Status: completed / success
+- SHA: 7ce07f1da525c80de696e935538f8226edfdf34a
+- Job: smoke-test passed
+
+### Concurrency Test (2 simultaneous comments):
+**Comment 1:** ID 3683794165 (19:17:07Z)
+**Comment 2:** ID 3683794170 (19:17:07Z)
+
+**Run 1** (20441664949):
+- Event: issue_comment
+- Created: 2025-12-22T19:17:10Z
+- Status: completed / success
+- Lock Check: success
+- Acquire Lock: **SKIPPED** ← Found processing label
+- Release Lock: SKIPPED
+
+**Run 2** (20441664922):
+- Event: issue_comment  
+- Created: 2025-12-22T19:17:10Z
+- Status: completed / success
+- Lock Check: success
+- Acquire Lock: **SUCCESS** ← Got the lock
+- Release Lock on Success: **SUCCESS**
+
+✅ **Concurrency lock verified**: One run acquired lock, the other skipped
+
+---
+
+## 3. Key Changes
+
+Added 4 new steps to workflow:
+
+1. **Concurrency Lock Check** (line 38-54):
+   - Checks for `processing` label
+   - If found: skip=true + post notice
+   - If not found: proceed
+
+2. **Acquire Lock** (line 56-64):
+   - Add `processing` label
+   - Remove `queued` label if exists
+
+3. **Release Lock on Success** (line 156-164):
+   - Remove `processing` label
+   - Add `complete` label
+
+4. **Release Lock on Failure** (line 166-174):
+   - Remove `processing` label
+   - Add `error` label
+
+**Label States:** queued, processing, waiting-input, complete, error
+
+---
+
+## 4. Diff Summary
+
+File: .github/workflows/llm-bot-stage2b-v3.yml
+Lines changed: +56 / -0
+Added:
+- Concurrency lock check step
+- Lock acquire/release steps
+- Label-based state management
+
+---
+
+## Evidence Files
+
+1. PR #44: https://github.com/edri2or-commits/project-38/pull/44
+2. Workflow dispatch run: https://github.com/edri2or-commits/project-38/actions/runs/20441633712
+3. Concurrency run 1 (skipped): https://github.com/edri2or-commits/project-38/actions/runs/20441664949
+4. Concurrency run 2 (processed): https://github.com/edri2or-commits/project-38/actions/runs/20441664922
+
+---
+
+## Verification Checklist
+
+✅ PR created and merged
+✅ workflow_dispatch trigger working
+✅ issue_comment trigger working  
+✅ Lock check prevents concurrent execution
+✅ Lock acquire/release cycle works
+✅ Labels updated correctly
+✅ All guards operational
+✅ LLM integration intact
+
+**Status:** PASS
+
+---
+
+Generated: 2025-12-22T19:18:00Z
