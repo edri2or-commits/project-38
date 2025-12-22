@@ -1,6 +1,6 @@
 # Operating Rules — Project 38 (V2)
 
-**Last Updated:** 2025-12-18  
+**Last Updated:** 2025-12-22  
 **Scope:** Anti-chaos rules for Project 38 operations
 
 ---
@@ -797,9 +797,69 @@ canon_files:
 
 ---
 
-## Summary: Top 10 Don'ts
+## Rule 16: Evidence-First Protocol (IssueOps)
 
-1. ❌ Execute new build/deploy without explicit user instruction (Slice 1 DONE, Slice 2A awaiting approval)
+**החל מיידית:** כל טענה/החלטה/סגירת Gate = 3 הוכחות חובה, בפוסט ב-Issue #24 (SSOT).
+
+### 1) PR/Commit Proof (חובה)
+- PR: <url>
+- SHA: <sha>
+- מצב: merged/open
+
+### 2) E2E Execution Proof (חובה)
+- Workflow Run: <url>
+- Trigger: issue_comment.created (Issue #24)
+- Status: success/failed + duration
+
+> `issue_comment` הוא event רשמי עם activity types כמו created/edited/deleted.
+
+### 3) Code Diff Proof (חובה)
+2–5 שורות diff שמראות את הדבר עצמו (guard/permissions/קריאת payload).
+
+### "אני רואה משהו אחר" — אין בקשות אימות ידני
+
+**❌ לא להגיד:** "תרענן / תבדוק בעצמך"
+
+**✅ במקום זה:** לאמת דרך API ולהדביק פלט/לינקים
+
+**דוגמאות אימות (מותר להדביק פלט מלא):**
+```bash
+# אימות תוכן קובץ מ-branch
+gh api repos/edri2or-commits/project-38/contents/FILE?ref=BRANCH
+
+# אימות סטטוס PR
+gh pr view NUM --json state,mergedAt,commits
+
+# אימות workflow run + לוגים
+gh run view RUN_ID --log
+```
+
+### Security Baseline
+
+**קריאת Event Data:**
+- **רק מ-`GITHUB_EVENT_PATH`** (payload מלא של webhook)
+- `GITHUB_EVENT_PATH` מכיל JSON של כל ה-webhook event
+- דוגמה: `jq -r '.comment.body' "$GITHUB_EVENT_PATH"`
+
+**הרשאות:**
+- שימוש ב-`GITHUB_TOKEN` עם מינימום הרשאות (least privilege)
+- דוגמה: `permissions: { issues: write, contents: read }`
+
+**אסור:**
+- ❌ קריאת user input דרך `${{ github.event.comment.body }}` ישירות ל-bash
+- ❌ שימוש ב-heredoc עם untrusted input
+- ❌ string interpolation של תוכן משתמש
+
+**מותר:**
+- ✅ `jq` או `json.load()` עם `GITHUB_EVENT_PATH`
+- ✅ הרשאות מפורשות בראש workflow
+- ✅ access control guards (OWNER/MEMBER בלבד)
+
+---
+
+## Summary: Top 12 Don'ts
+
+1. ❌ Execute new build/deploy without explicit user instruction
 2. ❌ Run gcloud without `--project` flag
 3. ❌ Create resources in wrong GCP project
 4. ❌ Recreate secrets or service accounts (they're DONE)
@@ -810,3 +870,4 @@ canon_files:
 9. ❌ Use Drive as SSOT (repo is truth now)
 10. ❌ Assume facts not in documentation
 11. ❌ Use "Gate N" without namespace (use "NAMESPACE-Gate-N")
+12. ❌ Say "check yourself" or "refresh" — validate via API instead
