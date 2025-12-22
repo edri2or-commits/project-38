@@ -17,28 +17,24 @@ jobs:
     steps:
       - name: Workflow Registration Verification
         run: |
-          echo "::notice::✅ workflow_dispatch smoke test PASSED"
-          echo "::notice::Workflow v3 registered successfully with workflow_dispatch trigger"
-          echo "Event: workflow_dispatch"
-          echo "Triggered by: ${{ github.actor }}"
-          echo "Timestamp: $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+          echo "::notice::workflow_dispatch test PASSED"
+          echo "Event: ${{ github.event_name }}"
+          echo "Actor: ${{ github.actor }}"
 
   llm-response:
     if: github.event_name == 'issue_comment' && github.event.issue.number == 24
     runs-on: ubuntu-latest
-
     steps:
-      - name: Bot Guard - Skip if comment from Bot user
+      - name: Bot Guard
         id: bot_check
         run: |
           if [ "${{ github.event.comment.user.type }}" == "Bot" ]; then
             echo "skip=true" >> $GITHUB_OUTPUT
-            echo "::notice::Skipping: Bot user detected"
           else
             echo "skip=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: Idempotency Check - Skip if already replied
+      - name: Idempotency Check
         id: idempotency_check
         if: steps.bot_check.outputs.skip == 'false'
         env:
@@ -46,86 +42,56 @@ jobs:
         run: |
           COMMENT_ID="${{ github.event.comment.id }}"
           MARKER="P38_IDEMPOTENCY_KEY: comment_${COMMENT_ID}"
-
-          FOUND=$(gh api repos/${{ github.repository }}/issues/24/comments \
-            --jq ".[] | select(.body | contains(\"$MARKER\")) | .id" | head -n 1)
-
+          FOUND=$(gh api repos/${{ github.repository }}/issues/24/comments --jq ".[] | select(.body | contains(\"$MARKER\")) | .id" | head -n 1)
           if [ -n "$FOUND" ]; then
             echo "skip=true" >> $GITHUB_OUTPUT
-            echo "::notice::Skipping: Already replied to comment"
           else
             echo "skip=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: Access Control - REST API only
+      - name: Access Control
         id: access_check
         if: steps.bot_check.outputs.skip == 'false' && steps.idempotency_check.outputs.skip == 'false'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           USERNAME="${{ github.event.comment.user.login }}"
-
-          PERMISSION=$(gh api repos/${{ github.repository }}/collaborators/${USERNAME}/permission \
-            --jq '.permission' 2>/dev/null || echo "none")
-
+          PERMISSION=$(gh api repos/${{ github.repository }}/collaborators/${USERNAME}/permission --jq '.permission' 2>/dev/null || echo "none")
           if [[ "$PERMISSION" == "admin" || "$PERMISSION" == "write" ]]; then
             echo "skip=false" >> $GITHUB_OUTPUT
-            echo "::notice::Access granted - $PERMISSION"
           else
             echo "skip=true" >> $GITHUB_OUTPUT
-            echo "::notice::Access denied - $PERMISSION"
           fi
 
-      - name: Command Guard - Only /ask or /plan
+      - name: Command Guard
         id: command_check
         if: steps.bot_check.outputs.skip == 'false' && steps.idempotency_check.outputs.skip == 'false' && steps.access_check.outputs.skip == 'false'
         run: |
           BODY=$(jq -r '.comment.body' "$GITHUB_EVENT_PATH")
-
           if echo "$BODY" | grep -qE '^\s*/ask|^\s*/plan'; then
             echo "skip=false" >> $GITHUB_OUTPUT
-            echo "::notice::Command detected"
           else
             echo "skip=true" >> $GITHUB_OUTPUT
-            echo "::notice::No command"
           fi
 
-      - name: Checkout repository
+      - name: Checkout
         if: steps.bot_check.outputs.skip == 'false' && steps.idempotency_check.outputs.skip == 'false' && steps.access_check.outputs.skip == 'false' && steps.command_check.outputs.skip == 'false'
         uses: actions/checkout@v4
 
-      - name: Authenticate to Google Cloud
+      - name: Authenticate to GCP
         if: steps.bot_check.outputs.skip == 'false' && steps.idempotency_check.outputs.skip == 'false' && steps.access_check.outputs.skip == 'false' && steps.command_check.outputs.skip == 'false'
-        id: auth
         uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: 'projects/673161610630/locations/global/workloadIdentityPools/github-actions-pool/providers/github-actions-provider'
           service_account: 'github-actions-llm@project-38-ai.iam.gserviceaccount.com'
 
-      - name: Get secrets from Secret Manager
+      - name: Get secrets
         if: steps.bot_check.outputs.skip == 'false' && steps.idempotency_check.outputs.skip == 'false' && steps.access_check.outputs.skip == 'false' && steps.command_check.outputs.skip == 'false'
         id: secrets
         uses: google-github-actions/get-secretmanager-secrets@v2
         with:
           secrets: |-
-            OPENAI_API_KEY:project-38-ai/openai-api-key
             ANTHROPIC_API_KEY:project-38-ai/anthropic-api-key
-            GEMINI_API_KEY:project-38-ai/gemini-api-key
-
-      - name: Load context from repo
-        if: steps.bot_check.outputs.skip == 'false' && steps.idempotency_check.outputs.skip == 'false' && steps.access_check.outputs.skip == 'false' && steps.command_check.outputs.skip == 'false'
-        id: context
-        run: |
-          SYSTEM_MAP=$(cat docs/_system/SYSTEM_MAP.md)
-          PHASE_STATUS=$(cat docs/context/phase_status.md)
-
-          echo "SYSTEM_MAP<<EOF" >> $GITHUB_ENV
-          echo "$SYSTEM_MAP" >> $GITHUB_ENV
-          echo "EOF" >> $GITHUB_ENV
-
-          echo "PHASE_STATUS<<EOF" >> $GITHUB_ENV
-          echo "$PHASE_STATUS" >> $GITHUB_ENV
-          echo "EOF" >> $GITHUB_ENV
 
       - name: Set up Python
         if: steps.bot_check.outputs.skip == 'false' && steps.idempotency_check.outputs.skip == 'false' && steps.access_check.outputs.skip == 'false' && steps.command_check.outputs.skip == 'false'
@@ -133,98 +99,36 @@ jobs:
         with:
           python-version: '3.11'
 
-        - name: Install dependencies
+      - name: Install deps
         if: steps.bot_check.outputs.skip == 'false' && steps.idempotency_check.outputs.skip == 'false' && steps.access_check.outputs.skip == 'false' && steps.command_check.outputs.skip == 'false'
-        run: |
-          pip install openai anthropic google-generativeai
+        run: pip install anthropic
 
-      - name: Generate LLM response
+      - name: Generate response
         if: steps.bot_check.outputs.skip == 'false' && steps.idempotency_check.outputs.skip == 'false' && steps.access_check.outputs.skip == 'false' && steps.command_check.outputs.skip == 'false'
-        id: llm
         env:
-          OPENAI_API_KEY: ${{ steps.secrets.outputs.OPENAAPI_API_KEY }}
           ANTHROPIC_API_KEY: ${{ steps.secrets.outputs.ANTHROPIC_API_KEY }}
-          GEMINI_API_KEY: ${{ steps.secrets.outputs.GEMINI_API_KEY }}
-          GITHUB_EVENT_PATH: ${{ github.event_path }}
-          COMMENT_ID: ${{ github.event.comment.id }}
         run: |
-          python3 << 'PYTHON_EOF'
-          import os
-          import json
+          python3 -c "
+          import os, json
           from anthropic import Anthropic
+          with open(os.environ['GITHUB_EVENT_PATH']) as f: event = json.load(f)
+          body = event['comment']['body']
+          user = event['comment']['user']['login']
+          cid = event['comment']['id']
+          cmd = body.strip().split('\n')[0]
+          query = body[len(cmd):].strip() if len(body) > len(cmd) else cmd
+          client = Anthropic(api_key=os.environ['ANTHROPIC_API_KEY'])
+          msg = client.messages.create(model='claude-sonnet-4-20250514', max_tokens=800, messages=[{'role': 'user', 'content': f'Project 38 IssueOps: @{user} asked: {query}'}])
+          text = msg.content[0].text
+          output = f'**LLM Response (v3)**\n\n{text}\n\n---\n*Command: {cmd.split()[0]}*\n<!-- P38_IDEMPOTENCY_KEY: comment_{cid} -->'
+          with open(os.environ['GITHUB_ENV'], 'a') as f: f.write(f'LLM_RESPONSE<<EOF\n{output}\nEOF\n')
+          print('::notice::Generated')
+          "
 
-          with open(os.environ["GITHUB_EVENT_PATH"], "r") as f:
-              event = json.load(f)
-
-          comment_body = event["comment"]["body"]
-          comment_user = event["comment"]["user"]["login"]
-          comment_id = os.environ["COMMENT_ID"]
-
-          system_map = os.environ.get("SYSTEM_MAP", "")
-          phase_status = os.environ.get("PHASE_STATUS", "")
-
-          command_line = comment_body.strip().split('\n')[0]
-          query = comment_body[len(command_line):].strip()
-
-          system_prompt = f"""You are the Project 38 IssueOps assistant.
-
-          CONTEXT:
-
-          SYSTEM MAP:
-          {system_map[:2000]}
-
-          PHASE STATUS:
-          {phase_status[:2000]}
-
-          Your role: Answer questions about Project 38 status, architecture, and next steps.
-          Keep responses concise (2-3 paragraphs max).
-          Reference SSOT files when relevant.
-          """
-
-          client = Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
-
-          message = client.messages.create(
-              model="claude-sonnet-4-20250514",
-              max_tokens=1000,
-              system=system_prompt,
-              messages=[
-                  {
-                      "role": "user",
-                      "content": f"@{comment_user} asked: {query if query else command_line}"
-                  }
-              ]
-          )
-
-          response_text = message.content[0].text
-
-          output = f"""🤖 **LLM Response** (Claude Sonnet 4 v3)
-
-{response_text}
-
----
-*Command: `{command_line.split()[0]}`*
-*Model: claude-sonnet-4-20250514*
-<!-- P38_LLM_RESPONSE -->
-<!-- P38_IDEMPOTENCY_KEY: comment_{comment_id} -->"""
-
-          with open(os.environ["GITHUB_ENV"], "a") as f:
-              f.write("LLM_RESPONSE<<EOF\n")
-              f.write(output)
-              f.write("\nEOF\n")
-
-          print("::notice::LLM response generated successfully")
-          PYTHON_EOF
-
-      - name: Post LLM response to issue
+      - name: Post response
         if: steps.bot_check.outputs.skip == 'false' && steps.idempotency_check.outputs.skip == 'false' && steps.access_check.outputs.skip == 'false' && steps.command_check.outputs.skip == 'false'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh api \
-            --method POST \
-            -H "Accept: application/vnd.github+json" \
-            -H "X-GitHub-Api-Version: 2022-11-28" \
-            /repos/${{ github.repository }}/issues/${{ github.event.issue.number }}/comments \
-            -f body="$LLM_RESPONSE"
-
-          echo "::notice::LLM response posted to Issue #${{ github.event.issue.number }}"
+          gh api --method POST -H "Accept: application/vnd.github+json" /repos/${{ github.repository }}/issues/${{ github.event.issue.number }}/comments -f body="$LLM_RESPONSE"
+          echo "::notice::Posted"
