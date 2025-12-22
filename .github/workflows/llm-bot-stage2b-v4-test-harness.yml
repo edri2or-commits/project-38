@@ -1,0 +1,251 @@
+name: LLM Bot - Stage 2B v4 (Test Harness)
+
+on:
+  issue_comment:
+    types: [created]
+  workflow_dispatch:
+    inputs:
+      test_mode:
+        description: 'Test mode: none, simulate_fail, simulate_retry, simulate_truncate'
+        required: false
+        default: 'none'
+      test_query:
+        description: 'Test query to use (for truncate test)'
+        required: false
+        default: 'What is 2+2?'
+
+permissions:
+  contents: read
+  id-token: write
+  issues: write
+
+jobs:
+  llm-response:
+    if: |
+      (github.event_name == 'issue_comment' && github.event.issue.number == 24) ||
+      github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    
+    steps:
+      # Bot check (skip for workflow_dispatch)
+      - name: Check if comment is from bot
+        id: bot_check
+        if: github.event_name == 'issue_comment'
+        run: |
+          if [ "${{ github.event.comment.user.type }}" == "Bot" ]; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+
+      # Checkout
+      - name: Checkout
+        if: |
+          (github.event_name == 'issue_comment' && steps.bot_check.outputs.skip != 'true') ||
+          github.event_name == 'workflow_dispatch'
+        uses: actions/checkout@v4
+
+      # Auth GCP
+      - name: Authenticate to Google Cloud
+        if: |
+          (github.event_name == 'issue_comment' && steps.bot_check.outputs.skip != 'true') ||
+          github.event_name == 'workflow_dispatch'
+        id: auth_gcp
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+
+      # Get secrets
+      - name: Access Secret Manager
+        if: |
+          (github.event_name == 'issue_comment' && steps.bot_check.outputs.skip != 'true') ||
+          github.event_name == 'workflow_dispatch'
+        id: secrets
+        uses: google-github-actions/get-secretmanager-secrets@v2
+        with:
+          secrets: |-
+            ANTHROPIC_API_KEY:${{ secrets.GCP_PROJECT_ID }}/anthropic-api-key
+
+      # Setup Python
+      - name: Setup Python
+        if: |
+          (github.event_name == 'issue_comment' && steps.bot_check.outputs.skip != 'true') ||
+          github.event_name == 'workflow_dispatch'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # Install deps
+      - name: Install dependencies
+        if: |
+          (github.event_name == 'issue_comment' && steps.bot_check.outputs.skip != 'true') ||
+          github.event_name == 'workflow_dispatch'
+        run: pip install anthropic
+
+      # Generate response with TEST HARNESS
+      - name: Generate response
+        id: generate
+        if: |
+          (github.event_name == 'issue_comment' && steps.bot_check.outputs.skip != 'true') ||
+          github.event_name == 'workflow_dispatch'
+        timeout-minutes: 3
+        run: |
+          python3 << 'PYTHON_EOF'
+          import os
+          import sys
+          import time
+          import json
+          from anthropic import Anthropic
+
+          MAX_RETRIES = 3
+          BASE_DELAY = 2
+          CONTEXT_LIMIT = 4000
+          
+          TEST_MODE = "${{ inputs.test_mode }}"
+          
+          print(f"::notice::Test mode: {TEST_MODE}")
+          
+          # TEST HARNESS: Simulate immediate failure
+          if TEST_MODE == "simulate_fail":
+              print("::error::TEST HARNESS: Simulating immediate failure")
+              sys.exit(1)
+          
+          # Get query
+          if "${{ github.event_name }}" == "workflow_dispatch":
+              user_query = "${{ inputs.test_query }}"
+              comment_id = "test_dispatch"
+          else:
+              user_query = """${{ github.event.comment.body }}"""
+              comment_id = "${{ github.event.comment.id }}"
+          
+          # TEST HARNESS: Simulate long context for truncation
+          if TEST_MODE == "simulate_truncate":
+              user_query = "/ask " + ("X" * 5000)
+              print(f"::notice::TEST HARNESS: Generated {len(user_query)} char query")
+          
+          # Truncation check
+          truncated = False
+          if len(user_query) > CONTEXT_LIMIT:
+              print(f"::warning::Context truncated from {len(user_query)} to {CONTEXT_LIMIT} chars")
+              user_query = user_query[:CONTEXT_LIMIT]
+              truncated = True
+          
+          api_key = os.environ.get("ANTHROPIC_API_KEY")
+          if not api_key:
+              print("::error::No API key")
+              sys.exit(1)
+          
+          client = Anthropic(api_key=api_key)
+          
+          # Retry loop with backoff
+          for attempt in range(1, MAX_RETRIES + 1):
+              try:
+                  print(f"::notice::Retry attempt {attempt}/{MAX_RETRIES}")
+                  start_time = time.time()
+                  
+                  # TEST HARNESS: Simulate retry failures
+                  if TEST_MODE == "simulate_retry" and attempt < 3:
+                      print(f"::warning::TEST HARNESS: Simulating failure on attempt {attempt}")
+                      raise Exception("Simulated API failure for retry test")
+                  
+                  response = client.messages.create(
+                      model="claude-sonnet-4-20250514",
+                      max_tokens=200,
+                      messages=[{"role": "user", "content": user_query}]
+                  )
+                  
+                  elapsed = time.time() - start_time
+                  reply = response.content[0].text
+                  
+                  print(f"::notice::Success on attempt {attempt} (took {elapsed:.2f}s)")
+                  
+                  output = {
+                      "reply": reply,
+                      "comment_id": comment_id,
+                      "attempts": attempt,
+                      "truncated": truncated,
+                      "test_mode": TEST_MODE
+                  }
+                  
+                  with open(os.environ.get('GITHUB_OUTPUT', '/dev/null'), 'a') as f:
+                      f.write(f"result={json.dumps(output)}\n")
+                  
+                  sys.exit(0)
+                  
+              except Exception as e:
+                  elapsed = time.time() - start_time
+                  print(f"::error::Attempt {attempt} failed after {elapsed:.2f}s: {str(e)}")
+                  
+                  if attempt < MAX_RETRIES:
+                      delay = BASE_DELAY ** attempt
+                      print(f"::notice::Backing off for {delay}s before retry...")
+                      time.sleep(delay)
+                  else:
+                      print(f"::error::All {MAX_RETRIES} attempts exhausted")
+                      sys.exit(1)
+          
+          PYTHON_EOF
+        env:
+          ANTHROPIC_API_KEY: ${{ steps.secrets.outputs.ANTHROPIC_API_KEY }}
+
+      # Post response
+      - name: Post response
+        if: success() && steps.generate.outputs.result != ''
+        run: |
+          RESULT='${{ steps.generate.outputs.result }}'
+          
+          REPLY=$(echo "$RESULT" | jq -r '.reply')
+          COMMENT_ID=$(echo "$RESULT" | jq -r '.comment_id')
+          ATTEMPTS=$(echo "$RESULT" | jq -r '.attempts')
+          TRUNCATED=$(echo "$RESULT" | jq -r '.truncated')
+          TEST_MODE=$(echo "$RESULT" | jq -r '.test_mode')
+          
+          if [ "$TRUNCATED" == "true" ]; then
+            NOTICE="⚠️ Context truncated to 4000 chars"
+          else
+            NOTICE=""
+          fi
+          
+          MESSAGE="## 🤖 LLM Response (v4 Test Harness)
+
+$REPLY
+
+$NOTICE
+
+---
+*Test Mode: $TEST_MODE | Attempts: $ATTEMPTS*  
+*P38_IDEMPOTENCY_KEY: comment_${COMMENT_ID}*"
+
+          gh api /repos/${{ github.repository }}/issues/24/comments -X POST -f body="$MESSAGE"
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      # Report Failure
+      - name: Report Failure
+        if: |
+          always() && failure() &&
+          github.event.issue.number == 24
+        run: |
+          CAUSE="Unknown"
+          if [ "${{ steps.bot_check.outcome }}" == "failure" ]; then CAUSE="bot_check"; fi
+          if [ "${{ steps.checkout.outcome }}" == "failure" ]; then CAUSE="checkout"; fi
+          if [ "${{ steps.auth_gcp.outcome }}" == "failure" ]; then CAUSE="auth_gcp"; fi
+          if [ "${{ steps.secrets.outcome }}" == "failure" ]; then CAUSE="secrets"; fi
+          if [ "${{ steps.generate.outcome }}" == "failure" ]; then CAUSE="generate_response"; fi
+          if [ "${{ steps.post-response.outcome }}" == "failure" ]; then CAUSE="post_response"; fi
+          
+          MESSAGE="## 🚨 Workflow Failed
+
+**Run:** [#${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})  
+**Cause:** Step \`$CAUSE\` failed  
+**Event:** ${{ github.event_name }}  
+**Time:** $(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+---
+*P38_FAILURE_REPORT: run_${{ github.run_id }}*"
+
+          gh api /repos/${{ github.repository }}/issues/24/comments -X POST -f body="$MESSAGE"
+        env:
+          GH_TOKEN: ${{ github.token }}
