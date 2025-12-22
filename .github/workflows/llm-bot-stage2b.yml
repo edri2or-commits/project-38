@@ -12,12 +12,22 @@ permissions:
 
 jobs:
   llm-response:
-    if: ${{ github.event.issue.number == 24 }}
+    if: ${{ (github.event_name == 'issue_comment' && github.event.issue.number == 24) || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
-    
+
     steps:
+      - name: Smoke Test - workflow_dispatch mode
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          echo "::notice::Workflow_dispatch smoke test - workflow registered successfully"
+          echo "::notice::This is a registration verification run - no issue payload"
+          echo "Event: workflow_dispatch"
+          echo "Triggered by: ${{ github.actor }}"
+          exit 0
+
       - name: Bot Guard - Skip if comment from Bot user
         id: bot_check
+        if: github.event_name == 'issue_comment'
         run: |
           if [ "${{ github.event.comment.user.type }}" == "Bot" ]; then
             echo "skip=true" >> $GITHUB_OUTPUT
@@ -25,37 +35,37 @@ jobs:
           else
             echo "skip=false" >> $GITHUB_OUTPUT
           fi
-      
+
       - name: Idempotency Check - Skip if already replied
         id: idempotency_check
-        if: steps.bot_check.outputs.skip == 'false'
+        if: github.event_name == 'issue_comment' && steps.bot_check.outputs.skip == 'false'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           COMMENT_ID="${{ github.event.comment.id }}"
           MARKER="P38_IDEMPOTENCY_KEY: comment_${COMMENT_ID}"
-          
+
           FOUND=$(gh api repos/${{ github.repository }}/issues/24/comments \
             --jq ".[] | select(.body | contains(\"$MARKER\")) | .id" | head -n 1)
-          
+
           if [ -n "$FOUND" ]; then
             echo "skip=true" >> $GITHUB_OUTPUT
             echo "::notice::Skipping: Already replied to comment"
           else
             echo "skip=false" >> $GITHUB_OUTPUT
           fi
-      
+
       - name: Access Control - REST API only
         id: access_check
-        if: steps.bot_check.outputs.skip == 'false' && steps.idempotency_check.outputs.skip == 'false'
+        if: github.event_name == 'issue_comment' && steps.bot_check.outputs.skip == 'false' && steps.idempotency_check.outputs.skip == 'false'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           USERNAME="${{ github.event.comment.user.login }}"
-          
+
           PERMISSION=$(gh api repos/${{ github.repository }}/collaborators/${USERNAME}/permission \
             --jq '.permission' 2>/dev/null || echo "none")
-          
+
           if [[ "$PERMISSION" == "admin" || "$PERMISSION" == "write" ]]; then
             echo "skip=false" >> $GITHUB_OUTPUT
             echo "::notice::Access granted - $PERMISSION"
@@ -63,13 +73,13 @@ jobs:
             echo "skip=true" >> $GITHUB_OUTPUT
             echo "::notice::Access denied - $PERMISSION"
           fi
-      
+
       - name: Command Guard - Only /ask or /plan
         id: command_check
-        if: steps.bot_check.outputs.skip == 'false' && steps.idempotency_check.outputs.skip == 'false' && steps.access_check.outputs.skip == 'false'
+        if: github.event_name == 'issue_comment' && steps.bot_check.outputs.skip == 'false' && steps.idempotency_check.outputs.skip == 'false' && steps.access_check.outputs.skip == 'false'
         run: |
           BODY=$(jq -r '.comment.body' "$GITHUB_EVENT_PATH")
-          
+
           if echo "$BODY" | grep -qE '^\s*/ask|^\s*/plan'; then
             echo "skip=false" >> $GITHUB_OUTPUT
             echo "::notice::Command detected"
@@ -77,21 +87,21 @@ jobs:
             echo "skip=true" >> $GITHUB_OUTPUT
             echo "::notice::No command"
           fi
-      
+
       - name: Checkout repository
-        if: steps.bot_check.outputs.skip == 'false' && steps.idempotency_check.outputs.skip == 'false' && steps.access_check.outputs.skip == 'false' && steps.command_check.outputs.skip == 'false'
+        if: github.event_name == 'issue_comment' && steps.bot_check.outputs.skip == 'false' && steps.idempotency_check.outputs.skip == 'false' && steps.access_check.outputs.skip == 'false' && steps.command_check.outputs.skip == 'false'
         uses: actions/checkout@v4
-      
+
       - name: Authenticate to Google Cloud
-        if: steps.bot_check.outputs.skip == 'false' && steps.idempotency_check.outputs.skip == 'false' && steps.access_check.outputs.skip == 'false' && steps.command_check.outputs.skip == 'false'
+        if: github.event_name == 'issue_comment' && steps.bot_check.outputs.skip == 'false' && steps.idempotency_check.outputs.skip == 'false' && steps.access_check.outputs.skip == 'false' && steps.command_check.outputs.skip == 'false'
         id: auth
         uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: 'projects/673161610630/locations/global/workloadIdentityPools/github-actions-pool/providers/github-actions-provider'
           service_account: 'github-actions-llm@project-38-ai.iam.gserviceaccount.com'
-      
+
       - name: Get secrets from Secret Manager
-        if: steps.bot_check.outputs.skip == 'false' && steps.idempotency_check.outputs.skip == 'false' && steps.access_check.outputs.skip == 'false' && steps.command_check.outputs.skip == 'false'
+        if: github.event_name == 'issue_comment' && steps.bot_check.outputs.skip == 'false' && steps.idempotency_check.outputs.skip == 'false' && steps.access_check.outputs.skip == 'false' && steps.command_check.outputs.skip == 'false'
         id: secrets
         uses: google-github-actions/get-secretmanager-secrets@v2
         with:
@@ -99,35 +109,35 @@ jobs:
             OPENAI_API_KEY:project-38-ai/openai-api-key
             ANTHROPIC_API_KEY:project-38-ai/anthropic-api-key
             GEMINI_API_KEY:project-38-ai/gemini-api-key
-      
+
       - name: Load context from repo
-        if: steps.bot_check.outputs.skip == 'false' && steps.idempotency_check.outputs.skip == 'false' && steps.access_check.outputs.skip == 'false' && steps.command_check.outputs.skip == 'false'
+        if: github.event_name == 'issue_comment' && steps.bot_check.outputs.skip == 'false' && steps.idempotency_check.outputs.skip == 'false' && steps.access_check.outputs.skip == 'false' && steps.command_check.outputs.skip == 'false'
         id: context
         run: |
           SYSTEM_MAP=$(cat docs/_system/SYSTEM_MAP.md)
           PHASE_STATUS=$(cat docs/context/phase_status.md)
-          
+
           echo "SYSTEM_MAP<<EOF" >> $GITHUB_ENV
           echo "$SYSTEM_MAP" >> $GITHUB_ENV
           echo "EOF" >> $GITHUB_ENV
-          
+
           echo "PHASE_STATUS<<EOF" >> $GITHUB_ENV
           echo "$PHASE_STATUS" >> $GITHUB_ENV
           echo "EOF" >> $GITHUB_ENV
-      
+
       - name: Set up Python
-        if: steps.bot_check.outputs.skip == 'false' && steps.idempotency_check.outputs.skip == 'false' && steps.access_check.outputs.skip == 'false' && steps.command_check.outputs.skip == 'false'
+        if: github.event_name == 'issue_comment' && steps.bot_check.outputs.skip == 'false' && steps.idempotency_check.outputs.skip == 'false' && steps.access_check.outputs.skip == 'false' && steps.command_check.outputs.skip == 'false'
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      
+
       - name: Install dependencies
-        if: steps.bot_check.outputs.skip == 'false' && steps.idempotency_check.outputs.skip == 'false' && steps.access_check.outputs.skip == 'false' && steps.command_check.outputs.skip == 'false'
+        if: github.event_name == 'issue_comment' && steps.bot_check.outputs.skip == 'false' && steps.idempotency_check.outputs.skip == 'false' && steps.access_check.outputs.skip == 'false' && steps.command_check.outputs.skip == 'false'
         run: |
           pip install openai anthropic google-generativeai
-      
+
       - name: Generate LLM response
-        if: steps.bot_check.outputs.skip == 'false' && steps.idempotency_check.outputs.skip == 'false' && steps.access_check.outputs.skip == 'false' && steps.command_check.outputs.skip == 'false'
+        if: github.event_name == 'issue_comment' && steps.bot_check.outputs.skip == 'false' && steps.idempotency_check.outputs.skip == 'false' && steps.access_check.outputs.skip == 'false' && steps.command_check.outputs.skip == 'false'
         id: llm
         env:
           OPENAI_API_KEY: ${{ steps.secrets.outputs.OPENAI_API_KEY }}
@@ -140,37 +150,37 @@ jobs:
           import os
           import json
           from anthropic import Anthropic
-          
+
           with open(os.environ["GITHUB_EVENT_PATH"], "r") as f:
               event = json.load(f)
-          
+
           comment_body = event["comment"]["body"]
           comment_user = event["comment"]["user"]["login"]
           comment_id = os.environ["COMMENT_ID"]
-          
+
           system_map = os.environ.get("SYSTEM_MAP", "")
           phase_status = os.environ.get("PHASE_STATUS", "")
-          
+
           command_line = comment_body.strip().split('\n')[0]
           query = comment_body[len(command_line):].strip()
-          
+
           system_prompt = f"""You are the Project 38 IssueOps assistant.
-          
+
           CONTEXT:
-          
+
           SYSTEM MAP:
           {system_map[:2000]}
-          
+
           PHASE STATUS:
           {phase_status[:2000]}
-          
+
           Your role: Answer questions about Project 38 status, architecture, and next steps.
           Keep responses concise (2-3 paragraphs max).
           Reference SSOT files when relevant.
           """
-          
+
           client = Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
-          
+
           message = client.messages.create(
               model="claude-sonnet-4-20250514",
               max_tokens=1000,
@@ -182,9 +192,9 @@ jobs:
                   }
               ]
           )
-          
+
           response_text = message.content[0].text
-          
+
           output = f"""🤖 **LLM Response** (Claude Sonnet 4)
 
 {response_text}
@@ -194,17 +204,17 @@ jobs:
 *Model: claude-sonnet-4-20250514*
 <!-- P38_LLM_RESPONSE -->
 <!-- P38_IDEMPOTENCY_KEY: comment_{comment_id} -->"""
-          
+
           with open(os.environ["GITHUB_ENV"], "a") as f:
               f.write("LLM_RESPONSE<<EOF\n")
               f.write(output)
               f.write("\nEOF\n")
-          
+
           print("::notice::LLM response generated successfully")
           PYTHON_EOF
-      
+
       - name: Post LLM response to issue
-        if: steps.bot_check.outputs.skip == 'false' && steps.idempotency_check.outputs.skip == 'false' && steps.access_check.outputs.skip == 'false' && steps.command_check.outputs.skip == 'false'
+        if: github.event_name == 'issue_comment' && steps.bot_check.outputs.skip == 'false' && steps.idempotency_check.outputs.skip == 'false' && steps.access_check.outputs.skip == 'false' && steps.command_check.outputs.skip == 'false'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -214,5 +224,5 @@ jobs:
             -H "X-GitHub-Api-Version: 2022-11-28" \
             /repos/${{ github.repository }}/issues/${{ github.event.issue.number }}/comments \
             -f body="$LLM_RESPONSE"
-          
+
           echo "::notice::LLM response posted to Issue #${{ github.event.issue.number }}"
