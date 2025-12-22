@@ -1,4 +1,4 @@
-name: LLM Bot - Stage 2B
+name: LLM Bot - Stage 2B v3
 
 on:
   issue_comment:
@@ -11,23 +11,25 @@ permissions:
   issues: write
 
 jobs:
+  smoke-test:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Workflow Registration Verification
+        run: |
+          echo "::notice::✅ workflow_dispatch smoke test PASSED"
+          echo "::notice::Workflow v3 registered successfully with workflow_dispatch trigger"
+          echo "Event: workflow_dispatch"
+          echo "Triggered by: ${{ github.actor }}"
+          echo "Timestamp: $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+
   llm-response:
-    if: ${{ (github.event_name == 'issue_comment' && github.event.issue.number == 24) || github.event_name == 'workflow_dispatch' }}
+    if: github.event_name == 'issue_comment' && github.event.issue.number == 24
     runs-on: ubuntu-latest
 
     steps:
-      - name: Smoke Test - workflow_dispatch mode
-        if: github.event_name == 'workflow_dispatch'
-        run: |
-          echo "::notice::Workflow_dispatch smoke test - workflow registered successfully"
-          echo "::notice::This is a registration verification run - no issue payload"
-          echo "Event: workflow_dispatch"
-          echo "Triggered by: ${{ github.actor }}"
-          exit 0
-
       - name: Bot Guard - Skip if comment from Bot user
         id: bot_check
-        if: github.event_name == 'issue_comment'
         run: |
           if [ "${{ github.event.comment.user.type }}" == "Bot" ]; then
             echo "skip=true" >> $GITHUB_OUTPUT
@@ -38,7 +40,7 @@ jobs:
 
       - name: Idempotency Check - Skip if already replied
         id: idempotency_check
-        if: github.event_name == 'issue_comment' && steps.bot_check.outputs.skip == 'false'
+        if: steps.bot_check.outputs.skip == 'false'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -57,7 +59,7 @@ jobs:
 
       - name: Access Control - REST API only
         id: access_check
-        if: github.event_name == 'issue_comment' && steps.bot_check.outputs.skip == 'false' && steps.idempotency_check.outputs.skip == 'false'
+        if: steps.bot_check.outputs.skip == 'false' && steps.idempotency_check.outputs.skip == 'false'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -76,7 +78,7 @@ jobs:
 
       - name: Command Guard - Only /ask or /plan
         id: command_check
-        if: github.event_name == 'issue_comment' && steps.bot_check.outputs.skip == 'false' && steps.idempotency_check.outputs.skip == 'false' && steps.access_check.outputs.skip == 'false'
+        if: steps.bot_check.outputs.skip == 'false' && steps.idempotency_check.outputs.skip == 'false' && steps.access_check.outputs.skip == 'false'
         run: |
           BODY=$(jq -r '.comment.body' "$GITHUB_EVENT_PATH")
 
@@ -89,11 +91,11 @@ jobs:
           fi
 
       - name: Checkout repository
-        if: github.event_name == 'issue_comment' && steps.bot_check.outputs.skip == 'false' && steps.idempotency_check.outputs.skip == 'false' && steps.access_check.outputs.skip == 'false' && steps.command_check.outputs.skip == 'false'
+        if: steps.bot_check.outputs.skip == 'false' && steps.idempotency_check.outputs.skip == 'false' && steps.access_check.outputs.skip == 'false' && steps.command_check.outputs.skip == 'false'
         uses: actions/checkout@v4
 
       - name: Authenticate to Google Cloud
-        if: github.event_name == 'issue_comment' && steps.bot_check.outputs.skip == 'false' && steps.idempotency_check.outputs.skip == 'false' && steps.access_check.outputs.skip == 'false' && steps.command_check.outputs.skip == 'false'
+        if: steps.bot_check.outputs.skip == 'false' && steps.idempotency_check.outputs.skip == 'false' && steps.access_check.outputs.skip == 'false' && steps.command_check.outputs.skip == 'false'
         id: auth
         uses: google-github-actions/auth@v2
         with:
@@ -101,7 +103,7 @@ jobs:
           service_account: 'github-actions-llm@project-38-ai.iam.gserviceaccount.com'
 
       - name: Get secrets from Secret Manager
-        if: github.event_name == 'issue_comment' && steps.bot_check.outputs.skip == 'false' && steps.idempotency_check.outputs.skip == 'false' && steps.access_check.outputs.skip == 'false' && steps.command_check.outputs.skip == 'false'
+        if: steps.bot_check.outputs.skip == 'false' && steps.idempotency_check.outputs.skip == 'false' && steps.access_check.outputs.skip == 'false' && steps.command_check.outputs.skip == 'false'
         id: secrets
         uses: google-github-actions/get-secretmanager-secrets@v2
         with:
@@ -111,7 +113,7 @@ jobs:
             GEMINI_API_KEY:project-38-ai/gemini-api-key
 
       - name: Load context from repo
-        if: github.event_name == 'issue_comment' && steps.bot_check.outputs.skip == 'false' && steps.idempotency_check.outputs.skip == 'false' && steps.access_check.outputs.skip == 'false' && steps.command_check.outputs.skip == 'false'
+        if: steps.bot_check.outputs.skip == 'false' && steps.idempotency_check.outputs.skip == 'false' && steps.access_check.outputs.skip == 'false' && steps.command_check.outputs.skip == 'false'
         id: context
         run: |
           SYSTEM_MAP=$(cat docs/_system/SYSTEM_MAP.md)
@@ -126,21 +128,21 @@ jobs:
           echo "EOF" >> $GITHUB_ENV
 
       - name: Set up Python
-        if: github.event_name == 'issue_comment' && steps.bot_check.outputs.skip == 'false' && steps.idempotency_check.outputs.skip == 'false' && steps.access_check.outputs.skip == 'false' && steps.command_check.outputs.skip == 'false'
+        if: steps.bot_check.outputs.skip == 'false' && steps.idempotency_check.outputs.skip == 'false' && steps.access_check.outputs.skip == 'false' && steps.command_check.outputs.skip == 'false'
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-      - name: Install dependencies
-        if: github.event_name == 'issue_comment' && steps.bot_check.outputs.skip == 'false' && steps.idempotency_check.outputs.skip == 'false' && steps.access_check.outputs.skip == 'false' && steps.command_check.outputs.skip == 'false'
+        - name: Install dependencies
+        if: steps.bot_check.outputs.skip == 'false' && steps.idempotency_check.outputs.skip == 'false' && steps.access_check.outputs.skip == 'false' && steps.command_check.outputs.skip == 'false'
         run: |
           pip install openai anthropic google-generativeai
 
       - name: Generate LLM response
-        if: github.event_name == 'issue_comment' && steps.bot_check.outputs.skip == 'false' && steps.idempotency_check.outputs.skip == 'false' && steps.access_check.outputs.skip == 'false' && steps.command_check.outputs.skip == 'false'
+        if: steps.bot_check.outputs.skip == 'false' && steps.idempotency_check.outputs.skip == 'false' && steps.access_check.outputs.skip == 'false' && steps.command_check.outputs.skip == 'false'
         id: llm
         env:
-          OPENAI_API_KEY: ${{ steps.secrets.outputs.OPENAI_API_KEY }}
+          OPENAI_API_KEY: ${{ steps.secrets.outputs.OPENAAPI_API_KEY }}
           ANTHROPIC_API_KEY: ${{ steps.secrets.outputs.ANTHROPIC_API_KEY }}
           GEMINI_API_KEY: ${{ steps.secrets.outputs.GEMINI_API_KEY }}
           GITHUB_EVENT_PATH: ${{ github.event_path }}
@@ -195,7 +197,7 @@ jobs:
 
           response_text = message.content[0].text
 
-          output = f"""🤖 **LLM Response** (Claude Sonnet 4)
+          output = f"""🤖 **LLM Response** (Claude Sonnet 4 v3)
 
 {response_text}
 
@@ -214,7 +216,7 @@ jobs:
           PYTHON_EOF
 
       - name: Post LLM response to issue
-        if: github.event_name == 'issue_comment' && steps.bot_check.outputs.skip == 'false' && steps.idempotency_check.outputs.skip == 'false' && steps.access_check.outputs.skip == 'false' && steps.command_check.outputs.skip == 'false'
+        if: steps.bot_check.outputs.skip == 'false' && steps.idempotency_check.outputs.skip == 'false' && steps.access_check.outputs.skip == 'false' && steps.command_check.outputs.skip == 'false'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -226,5 +228,3 @@ jobs:
             -f body="$LLM_RESPONSE"
 
           echo "::notice::LLM response posted to Issue #${{ github.event.issue.number }}"
-
-# Force refresh: 2025-12-22T18:05:00Z
