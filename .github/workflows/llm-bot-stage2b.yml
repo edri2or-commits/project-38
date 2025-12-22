@@ -13,7 +13,7 @@ permissions:
 jobs:
   llm-response:
     # Only run on Issue #24 (Control Room)
-    if: github.event.issue.number == 24
+    if: ${{ github.event.issue.number == 24 }}
     runs-on: ubuntu-latest
     
     steps:
