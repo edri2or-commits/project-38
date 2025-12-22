@@ -1,4 +1,4 @@
-name: LLM Bot - Stage 2B v3
+name: LLM Bot - Stage 2B v4
 
 on:
   issue_comment:
@@ -34,9 +34,34 @@ jobs:
             echo "skip=false" >> $GITHUB_OUTPUT
           fi
 
+      - name: Concurrency Lock Check
+        id: lock_check
+        if: steps.bot_check.outputs.skip == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          LABELS=$(gh api repos/${{ github.repository }}/issues/24 --jq '.labels[].name')
+          if echo "$LABELS" | grep -q "^processing$"; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+            echo "::notice::Skipping: Another workflow is processing"
+            COMMENT="Concurrency Lock Active - Another workflow is currently processing. Please wait. <!-- P38_CONCURRENCY_LOCK: comment_${{ github.event.comment.id }} -->"
+            gh api --method POST -H "Accept: application/vnd.github+json" /repos/${{ github.repository }}/issues/24/comments -f body="$COMMENT"
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Acquire Lock
+        if: steps.bot_check.outputs.skip == 'false' && steps.lock_check.outputs.skip == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api --method POST /repos/${{ github.repository }}/issues/24/labels -f labels[]="processing"
+          gh api --method DELETE /repos/${{ github.repository }}/issues/24/labels/queued 2>/dev/null || true
+          echo "::notice::Lock acquired"
+
       - name: Idempotency Check
         id: idempotency_check
-        if: steps.bot_check.outputs.skip == 'false'
+        if: steps.bot_check.outputs.skip == 'false' && steps.lock_check.outputs.skip == 'false'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -51,7 +76,7 @@ jobs:
 
       - name: Access Control
         id: access_check
-        if: steps.bot_check.outputs.skip == 'false' && steps.idempotency_check.outputs.skip == 'false'
+        if: steps.bot_check.outputs.skip == 'false' && steps.lock_check.outputs.skip == 'false' && steps.idempotency_check.outputs.skip == 'false'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -65,7 +90,7 @@ jobs:
 
       - name: Command Guard
         id: command_check
-        if: steps.bot_check.outputs.skip == 'false' && steps.idempotency_check.outputs.skip == 'false' && steps.access_check.outputs.skip == 'false'
+        if: steps.bot_check.outputs.skip == 'false' && steps.lock_check.outputs.skip == 'false' && steps.idempotency_check.outputs.skip == 'false' && steps.access_check.outputs.skip == 'false'
         run: |
           BODY=$(jq -r '.comment.body' "$GITHUB_EVENT_PATH")
           if echo "$BODY" | grep -qE '^\s*/ask|^\s*/plan'; then
@@ -75,18 +100,18 @@ jobs:
           fi
 
       - name: Checkout
-        if: steps.bot_check.outputs.skip == 'false' && steps.idempotency_check.outputs.skip == 'false' && steps.access_check.outputs.skip == 'false' && steps.command_check.outputs.skip == 'false'
+        if: steps.bot_check.outputs.skip == 'false' && steps.lock_check.outputs.skip == 'false' && steps.idempotency_check.outputs.skip == 'false' && steps.access_check.outputs.skip == 'false' && steps.command_check.outputs.skip == 'false'
         uses: actions/checkout@v4
 
       - name: Authenticate to GCP
-        if: steps.bot_check.outputs.skip == 'false' && steps.idempotency_check.outputs.skip == 'false' && steps.access_check.outputs.skip == 'false' && steps.command_check.outputs.skip == 'false'
+        if: steps.bot_check.outputs.skip == 'false' && steps.lock_check.outputs.skip == 'false' && steps.idempotency_check.outputs.skip == 'false' && steps.access_check.outputs.skip == 'false' && steps.command_check.outputs.skip == 'false'
         uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: 'projects/673161610630/locations/global/workloadIdentityPools/github-actions-pool/providers/github-actions-provider'
           service_account: 'github-actions-llm@project-38-ai.iam.gserviceaccount.com'
 
       - name: Get secrets
-        if: steps.bot_check.outputs.skip == 'false' && steps.idempotency_check.outputs.skip == 'false' && steps.access_check.outputs.skip == 'false' && steps.command_check.outputs.skip == 'false'
+        if: steps.bot_check.outputs.skip == 'false' && steps.lock_check.outputs.skip == 'false' && steps.idempotency_check.outputs.skip == 'false' && steps.access_check.outputs.skip == 'false' && steps.command_check.outputs.skip == 'false'
         id: secrets
         uses: google-github-actions/get-secretmanager-secrets@v2
         with:
@@ -94,17 +119,17 @@ jobs:
             ANTHROPIC_API_KEY:project-38-ai/anthropic-api-key
 
       - name: Set up Python
-        if: steps.bot_check.outputs.skip == 'false' && steps.idempotency_check.outputs.skip == 'false' && steps.access_check.outputs.skip == 'false' && steps.command_check.outputs.skip == 'false'
+        if: steps.bot_check.outputs.skip == 'false' && steps.lock_check.outputs.skip == 'false' && steps.idempotency_check.outputs.skip == 'false' && steps.access_check.outputs.skip == 'false' && steps.command_check.outputs.skip == 'false'
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
       - name: Install deps
-        if: steps.bot_check.outputs.skip == 'false' && steps.idempotency_check.outputs.skip == 'false' && steps.access_check.outputs.skip == 'false' && steps.command_check.outputs.skip == 'false'
+        if: steps.bot_check.outputs.skip == 'false' && steps.lock_check.outputs.skip == 'false' && steps.idempotency_check.outputs.skip == 'false' && steps.access_check.outputs.skip == 'false' && steps.command_check.outputs.skip == 'false'
         run: pip install anthropic
 
       - name: Generate response
-        if: steps.bot_check.outputs.skip == 'false' && steps.idempotency_check.outputs.skip == 'false' && steps.access_check.outputs.skip == 'false' && steps.command_check.outputs.skip == 'false'
+        if: steps.bot_check.outputs.skip == 'false' && steps.lock_check.outputs.skip == 'false' && steps.idempotency_check.outputs.skip == 'false' && steps.access_check.outputs.skip == 'false' && steps.command_check.outputs.skip == 'false'
         env:
           ANTHROPIC_API_KEY: ${{ steps.secrets.outputs.ANTHROPIC_API_KEY }}
         run: |
@@ -120,15 +145,33 @@ jobs:
           client = Anthropic(api_key=os.environ['ANTHROPIC_API_KEY'])
           msg = client.messages.create(model='claude-sonnet-4-20250514', max_tokens=800, messages=[{'role': 'user', 'content': f'Project 38 IssueOps: @{user} asked: {query}'}])
           text = msg.content[0].text
-          output = f'**LLM Response (v3)**\n\n{text}\n\n---\n*Command: {cmd.split()[0]}*\n<!-- P38_IDEMPOTENCY_KEY: comment_{cid} -->'
+          output = f'**LLM Response (v4)**\n\n{text}\n\n---\n*Command: {cmd.split()[0]}*\n<!-- P38_IDEMPOTENCY_KEY: comment_{cid} -->'
           with open(os.environ['GITHUB_ENV'], 'a') as f: f.write(f'LLM_RESPONSE<<EOF\n{output}\nEOF\n')
           print('::notice::Generated')
           "
 
       - name: Post response
-        if: steps.bot_check.outputs.skip == 'false' && steps.idempotency_check.outputs.skip == 'false' && steps.access_check.outputs.skip == 'false' && steps.command_check.outputs.skip == 'false'
+        if: steps.bot_check.outputs.skip == 'false' && steps.lock_check.outputs.skip == 'false' && steps.idempotency_check.outputs.skip == 'false' && steps.access_check.outputs.skip == 'false' && steps.command_check.outputs.skip == 'false'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh api --method POST -H "Accept: application/vnd.github+json" /repos/${{ github.repository }}/issues/${{ github.event.issue.number }}/comments -f body="$LLM_RESPONSE"
+          gh api --method POST -H "Accept: application/vnd.github+json" /repos/${{ github.repository }}/issues/24/comments -f body="$LLM_RESPONSE"
           echo "::notice::Posted"
+
+      - name: Release Lock on Success
+        if: success() && steps.bot_check.outputs.skip == 'false' && steps.lock_check.outputs.skip == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api --method DELETE /repos/${{ github.repository }}/issues/24/labels/processing 2>/dev/null || true
+          gh api --method POST /repos/${{ github.repository }}/issues/24/labels -f labels[]="complete"
+          echo "::notice::Lock released: complete"
+
+      - name: Release Lock on Failure
+        if: failure() && steps.bot_check.outputs.skip == 'false' && steps.lock_check.outputs.skip == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api --method DELETE /repos/${{ github.repository }}/issues/24/labels/processing 2>/dev/null || true
+          gh api --method POST /repos/${{ github.repository }}/issues/24/labels -f labels[]="error"
+          echo "::notice::Lock released: error"
