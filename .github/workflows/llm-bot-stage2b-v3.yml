@@ -149,23 +149,23 @@ jobs:
           BASE_DELAY = 2
           CONTEXT_LIMIT = 4000
 
-          with open(os.environ['GITHUB_EVENT_PATH']) as f:
+          with open(os.environ['GITHUB_EVENT_PATH_]) as f:
               event = json.load(f)
-
+          
           body = event['comment']['body']
           user = event['comment']['user']['login']
           cid = event['comment']['id']
           cmd = body.strip().split('\n')[0]
           query = body[len(cmd):].strip() if len(body) > len(cmd) else cmd
-
+          
           # Budget guard: truncate query
           truncated = False
           if len(query) > CONTEXT_LIMIT:
               query = query[:CONTEXT_LIMIT]
               truncated = True
-
+          
           client = Anthropic(api_key=os.environ['ANTHROPIC_API_KEY'])
-
+          
           # Retry logic with exponential backoff
           for attempt in range(1, MAX_RETRIES + 1):
               try:
@@ -176,20 +176,20 @@ jobs:
                       messages=[{'role': 'user', 'content': f'Project 38 IssueOps: @{user} asked: {query}'}]
                   )
                   text = msg.content[0].text
-
+                  
                   # Success - prepare output
                   truncation_notice = '\n\n⚠️ Context truncated to 4000 chars' if truncated else ''
                   output = f'**LLM Response (v4)**\n\n{text}{truncation_notice}\n\n---\n*Command: {cmd.split()[0]}*\n<!-- P38_IDEMPOTENCY_KEY: comment_{cid} -->'
-
+                  
                   with open(os.environ['GITHUB_ENV'], 'a') as f:
                       f.write(f'LLM_RESPONSE<<EOF\n{output}\nEOF\n')
-
+                  
                   print('::notice::Generated successfully')
                   sys.exit(0)
-
+                  
               except Exception as e:
                   print(f"::error::Attempt {attempt} failed: {str(e)}")
-
+                  
                   if attempt < MAX_RETRIES:
                       delay = BASE_DELAY ** attempt
                       print(f"::notice::Retrying in {delay}s...")
@@ -239,7 +239,7 @@ jobs:
         run: |
           # Determine failure cause
           CAUSE="Unknown failure"
-
+          
           if [ "${{ steps.checkout.outcome }}" == "failure" ]; then
             CAUSE="Checkout failed"
           elif [ "${{ steps.auth_gcp.outcome }}" == "failure" ]; then
@@ -257,10 +257,10 @@ jobs:
           elif [ "${{ steps.acquire_lock.outcome }}" == "failure" ]; then
             CAUSE="Failed to acquire lock"
           fi
-
+          
           RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-
+          
           FAILURE_COMMENT="❌ **Workflow Failed**
 
 **Run:** ${RUN_URL}
@@ -268,10 +268,10 @@ jobs:
 **Time:** ${TIMESTAMP}
 
 <!-- P38_FAILURE_REPORT: run_${{ github.run_id }} -->"
-
+          
           gh api --method POST \
             -H "Accept: application/vnd.github+json" \
             /repos/${{ github.repository }}/issues/24/comments \
             -f body="$FAILURE_COMMENT" || echo "::error::Failed to post failure report"
-
+          
           echo "::notice::Failure report posted"
