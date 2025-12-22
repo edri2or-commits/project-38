@@ -27,9 +27,30 @@ jobs:
             echo "skip=false" >> $GITHUB_OUTPUT
           fi
       
+      - name: Idempotency Check - Skip if already replied to this comment
+        id: idempotency_check
+        if: steps.bot_check.outputs.skip == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          COMMENT_ID="${{ github.event.comment.id }}"
+          MARKER="P38_IDEMPOTENCY_KEY: comment_${COMMENT_ID}"
+          
+          # Search Issue #24 comments for existing marker
+          FOUND=$(gh api repos/${{ github.repository }}/issues/24/comments \
+            --jq ".[] | select(.body | contains(\"$MARKER\")) | .id" | head -n 1)
+          
+          if [ -n "$FOUND" ]; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+            echo "::notice::Skipping: Already replied to comment #${COMMENT_ID} (found in comment #${FOUND})"
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+            echo "::notice::Idempotency OK - no previous reply to comment #${COMMENT_ID}"
+          fi
+      
       - name: Access Control - Only repo OWNER/MEMBER can use LLM
         id: access_check
-        if: steps.bot_check.outputs.skip == 'false'
+        if: steps.bot_check.outputs.skip == 'false' && steps.idempotency_check.outputs.skip == 'false'
         run: |
           AUTHOR_ASSOCIATION="${{ github.event.comment.author_association }}"
           
@@ -44,7 +65,7 @@ jobs:
       
       - name: Command Guard - Only /ask or /plan
         id: command_check
-        if: steps.bot_check.outputs.skip == 'false' && steps.access_check.outputs.skip == 'false'
+        if: steps.bot_check.outputs.skip == 'false' && steps.idempotency_check.outputs.skip == 'false' && steps.access_check.outputs.skip == 'false'
         run: |
           # Safe: Read comment body from GITHUB_EVENT_PATH with jq (no heredoc injection)
           BODY=$(jq -r '.comment.body' "$GITHUB_EVENT_PATH")
@@ -59,11 +80,11 @@ jobs:
           fi
       
       - name: Checkout repository
-        if: steps.bot_check.outputs.skip == 'false' && steps.access_check.outputs.skip == 'false' && steps.command_check.outputs.skip == 'false'
+        if: steps.bot_check.outputs.skip == 'false' && steps.idempotency_check.outputs.skip == 'false' && steps.access_check.outputs.skip == 'false' && steps.command_check.outputs.skip == 'false'
         uses: actions/checkout@v4
       
       - name: Authenticate to Google Cloud
-        if: steps.bot_check.outputs.skip == 'false' && steps.access_check.outputs.skip == 'false' && steps.command_check.outputs.skip == 'false'
+        if: steps.bot_check.outputs.skip == 'false' && steps.idempotency_check.outputs.skip == 'false' && steps.access_check.outputs.skip == 'false' && steps.command_check.outputs.skip == 'false'
         id: auth
         uses: google-github-actions/auth@v2
         with:
@@ -71,7 +92,7 @@ jobs:
           service_account: 'github-actions-llm@project-38-ai.iam.gserviceaccount.com'
       
       - name: Get secrets from Secret Manager
-        if: steps.bot_check.outputs.skip == 'false' && steps.access_check.outputs.skip == 'false' && steps.command_check.outputs.skip == 'false'
+        if: steps.bot_check.outputs.skip == 'false' && steps.idempotency_check.outputs.skip == 'false' && steps.access_check.outputs.skip == 'false' && steps.command_check.outputs.skip == 'false'
         id: secrets
         uses: google-github-actions/get-secretmanager-secrets@v2
         with:
@@ -81,7 +102,7 @@ jobs:
             GEMINI_API_KEY:project-38-ai/gemini-api-key
       
       - name: Load context from repo
-        if: steps.bot_check.outputs.skip == 'false' && steps.access_check.outputs.skip == 'false' && steps.command_check.outputs.skip == 'false'
+        if: steps.bot_check.outputs.skip == 'false' && steps.idempotency_check.outputs.skip == 'false' && steps.access_check.outputs.skip == 'false' && steps.command_check.outputs.skip == 'false'
         id: context
         run: |
           # Read SYSTEM_MAP and phase_status
@@ -98,24 +119,25 @@ jobs:
           echo "EOF" >> $GITHUB_ENV
       
       - name: Set up Python
-        if: steps.bot_check.outputs.skip == 'false' && steps.access_check.outputs.skip == 'false' && steps.command_check.outputs.skip == 'false'
+        if: steps.bot_check.outputs.skip == 'false' && steps.idempotency_check.outputs.skip == 'false' && steps.access_check.outputs.skip == 'false' && steps.command_check.outputs.skip == 'false'
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
       
       - name: Install dependencies
-        if: steps.bot_check.outputs.skip == 'false' && steps.access_check.outputs.skip == 'false' && steps.command_check.outputs.skip == 'false'
+        if: steps.bot_check.outputs.skip == 'false' && steps.idempotency_check.outputs.skip == 'false' && steps.access_check.outputs.skip == 'false' && steps.command_check.outputs.skip == 'false'
         run: |
           pip install openai anthropic google-generativeai
       
       - name: Generate LLM response
-        if: steps.bot_check.outputs.skip == 'false' && steps.access_check.outputs.skip == 'false' && steps.command_check.outputs.skip == 'false'
+        if: steps.bot_check.outputs.skip == 'false' && steps.idempotency_check.outputs.skip == 'false' && steps.access_check.outputs.skip == 'false' && steps.command_check.outputs.skip == 'false'
         id: llm
         env:
           OPENAI_API_KEY: ${{ steps.secrets.outputs.OPENAI_API_KEY }}
           ANTHROPIC_API_KEY: ${{ steps.secrets.outputs.ANTHROPIC_API_KEY }}
           GEMINI_API_KEY: ${{ steps.secrets.outputs.GEMINI_API_KEY }}
           GITHUB_EVENT_PATH: ${{ github.event_path }}
+          COMMENT_ID: ${{ github.event.comment.id }}
         run: |
           python3 << 'PYTHON_EOF'
           import os
@@ -128,6 +150,7 @@ jobs:
           
           comment_body = event["comment"]["body"]
           comment_user = event["comment"]["user"]["login"]
+          comment_id = os.environ["COMMENT_ID"]
           
           # Load context
           system_map = os.environ.get("SYSTEM_MAP", "")
@@ -170,7 +193,7 @@ jobs:
           
           response_text = message.content[0].text
           
-          # Prepare output
+          # Prepare output with idempotency marker
           output = f"""🤖 **LLM Response** (Claude Sonnet 4)
 
 {response_text}
@@ -178,7 +201,8 @@ jobs:
 ---
 *Command: `{command_line.split()[0]}`*
 *Model: claude-sonnet-4-20250514*
-<!-- P38_LLM_RESPONSE -->"""
+<!-- P38_LLM_RESPONSE -->
+<!-- P38_IDEMPOTENCY_KEY: comment_{comment_id} -->"""
           
           # Write to GITHUB_ENV for next step
           with open(os.environ["GITHUB_ENV"], "a") as f:
@@ -190,7 +214,7 @@ jobs:
           PYTHON_EOF
       
       - name: Post LLM response to issue
-        if: steps.bot_check.outputs.skip == 'false' && steps.access_check.outputs.skip == 'false' && steps.command_check.outputs.skip == 'false'
+        if: steps.bot_check.outputs.skip == 'false' && steps.idempotency_check.outputs.skip == 'false' && steps.access_check.outputs.skip == 'false' && steps.command_check.outputs.skip == 'false'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
