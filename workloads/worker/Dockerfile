@@ -7,6 +7,6 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY worker.py .
+COPY app.py .
 
-CMD exec gunicorn --bind :$PORT --workers 2 --threads 4 --timeout 300 worker:app
+CMD exec gunicorn --bind :$PORT --workers 2 --threads 4 --timeout 300 app:app
