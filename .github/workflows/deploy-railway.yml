@@ -1,0 +1,151 @@
+name: Deploy to Railway
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy'
+        required: false
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - staging
+  
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - 'docs/**'
+      - '**.md'
+      - '.github/**'
+      - '!.github/workflows/deploy-railway.yml'
+
+# Required for OIDC authentication to GCP
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  GCP_PROJECT_ID: project-38-ai
+  RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment || 'production' }}
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Authenticate to Google Cloud
+        id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: 'projects/673161610630/locations/global/workloadIdentityPools/github-actions-pool/providers/github-actions-provider'
+          service_account: 'github-actions-deployer@project-38-ai.iam.gserviceaccount.com'
+      
+      - name: Get LLM API Keys from Secret Manager
+        id: secrets
+        uses: google-github-actions/get-secretmanager-secrets@v2
+        with:
+          secrets: |-
+            OPENAI_API_KEY:project-38-ai/openai-api-key
+            ANTHROPIC_API_KEY:project-38-ai/anthropic-api-key
+      
+      - name: Generate secure passwords
+        id: passwords
+        run: |
+          # Generate PostgreSQL password (32-char base64)
+          POSTGRES_PASSWORD=$(openssl rand -base64 32 | tr -d '\n' | cut -c1-32)
+          echo "POSTGRES_PASSWORD=${POSTGRES_PASSWORD}" >> $GITHUB_OUTPUT
+          echo "::add-mask::${POSTGRES_PASSWORD}"
+          
+          # Generate Redis password (32-char base64)
+          REDIS_PASSWORD=$(openssl rand -base64 32 | tr -d '\n' | cut -c1-32)
+          echo "REDIS_PASSWORD=${REDIS_PASSWORD}" >> $GITHUB_OUTPUT
+          echo "::add-mask::${REDIS_PASSWORD}"
+          
+          # Generate SECRET_KEY (64-char hex)
+          SECRET_KEY=$(openssl rand -hex 32)
+          echo "SECRET_KEY=${SECRET_KEY}" >> $GITHUB_OUTPUT
+          echo "::add-mask::${SECRET_KEY}"
+          
+          echo "::notice::Generated 3 secure passwords (POSTGRES, REDIS, SECRET_KEY)"
+      
+      - name: Install Railway CLI
+        run: |
+          npm install -g @railway/cli
+          railway --version
+      
+      - name: Deploy to Railway
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          POSTGRES_USER: dify
+          POSTGRES_DB: dify
+          POSTGRES_PASSWORD: ${{ steps.passwords.outputs.POSTGRES_PASSWORD }}
+          REDIS_PASSWORD: ${{ steps.passwords.outputs.REDIS_PASSWORD }}
+          SECRET_KEY: ${{ steps.passwords.outputs.SECRET_KEY }}
+          OPENAI_API_KEY: ${{ steps.secrets.outputs.OPENAI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ steps.secrets.outputs.ANTHROPIC_API_KEY }}
+        run: |
+          echo "::group::Railway Deployment"
+          
+          # Link to Railway project
+          railway link ${{ env.RAILWAY_PROJECT_ID }}
+          
+          # Set environment variables
+          echo "::notice::Setting environment variables in Railway..."
+          
+          railway variables --set POSTGRES_USER="${POSTGRES_USER}"
+          railway variables --set POSTGRES_DB="${POSTGRES_DB}"
+          railway variables --set POSTGRES_PASSWORD="${POSTGRES_PASSWORD}"
+          railway variables --set REDIS_PASSWORD="${REDIS_PASSWORD}"
+          railway variables --set SECRET_KEY="${SECRET_KEY}"
+          railway variables --set OPENAI_API_KEY="${OPENAI_API_KEY}"
+          
+          # Set Anthropic key if available
+          if [ -n "${ANTHROPIC_API_KEY}" ]; then
+            railway variables --set ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY}"
+          fi
+          
+          # Deploy to Railway
+          echo "::notice::Deploying to Railway..."
+          railway up --detach
+          
+          echo "::endgroup::"
+          echo "::notice::✅ Deployment to Railway complete!"
+      
+      - name: Deployment summary
+        if: success()
+        run: |
+          echo "## 🚀 Railway Deployment Successful" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** ${{ inputs.environment || 'production' }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Project ID:** ${{ env.RAILWAY_PROJECT_ID }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Deployed:** $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Variables Set" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ POSTGRES_USER" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ POSTGRES_DB" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ POSTGRES_PASSWORD (auto-generated)" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ REDIS_PASSWORD (auto-generated)" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ SECRET_KEY (auto-generated)" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ OPENAI_API_KEY (from GCP Secret Manager)" >> $GITHUB_STEP_SUMMARY
+          if [ -n "${{ steps.secrets.outputs.ANTHROPIC_API_KEY }}" ]; then
+            echo "- ✅ ANTHROPIC_API_KEY (from GCP Secret Manager)" >> $GITHUB_STEP_SUMMARY
+          fi
+      
+      - name: Deployment failure notice
+        if: failure()
+        run: |
+          echo "## ❌ Railway Deployment Failed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Check the logs above for details." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Common Issues" >> $GITHUB_STEP_SUMMARY
+          echo "1. **RAILWAY_TOKEN not set:** Add it to GitHub Secrets" >> $GITHUB_STEP_SUMMARY
+          echo "2. **RAILWAY_PROJECT_ID not set:** Add it to GitHub Secrets" >> $GITHUB_STEP_SUMMARY
+          echo "3. **GCP auth failed:** Check WIF configuration" >> $GITHUB_STEP_SUMMARY
+          echo "4. **Secrets not found:** Verify Secret Manager permissions" >> $GITHUB_STEP_SUMMARY

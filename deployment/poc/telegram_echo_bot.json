@@ -1,0 +1,128 @@
+{
+  "name": "Telegram Echo Bot POC",
+  "active": false,
+  "versionId": "v1-telegram-poc",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "telegram-bot",
+        "httpMethod": "POST",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "tg-webhook",
+      "name": "Telegram Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [250, 300],
+      "webhookId": "telegram-bot"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Dedup by update_id using static data\nconst input = $input.first().json;\nconst update_id = input.update_id;\n\nif (!update_id) {\n  return [{ json: { skip: true, reason: 'no_update_id' } }];\n}\n\n// Get static data for dedup tracking\nconst staticData = $getWorkflowStaticData('global');\nif (!staticData.processed_ids) {\n  staticData.processed_ids = [];\n}\n\n// Check if already processed\nif (staticData.processed_ids.includes(update_id)) {\n  return [{ json: { skip: true, reason: 'duplicate', update_id } }];\n}\n\n// Mark as processed (keep last 100)\nstaticData.processed_ids.push(update_id);\nif (staticData.processed_ids.length > 100) {\n  staticData.processed_ids.shift();\n}\n\n// Extract message info\nconst message = input.message || input.edited_message || {};\nconst chat_id = message.chat?.id;\nconst text = message.text || '';\nconst from = message.from?.first_name || 'Unknown';\n\nreturn [{\n  json: {\n    skip: false,\n    update_id,\n    chat_id,\n    text,\n    from,\n    response_text: `Echo from n8n: ${text}`\n  }\n}];"
+      },
+      "id": "dedup-code",
+      "name": "Dedup Check",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "skip-check",
+              "leftValue": "={{ $json.skip }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-not-skip",
+      "name": "If Not Skipped",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{ $env.TELEGRAM_BOT_TOKEN }}/sendMessage",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"chat_id\": {{ $json.chat_id }},\n  \"text\": \"{{ $json.response_text }}\"\n}",
+        "options": {}
+      },
+      "id": "send-response",
+      "name": "Send Telegram Response",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [850, 200]
+    },
+    {
+      "parameters": {},
+      "id": "noop-skip",
+      "name": "Skipped (Dedup)",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [850, 400]
+    }
+  ],
+  "connections": {
+    "Telegram Webhook": {
+      "main": [
+        [
+          {
+            "node": "Dedup Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dedup Check": {
+      "main": [
+        [
+          {
+            "node": "If Not Skipped",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Not Skipped": {
+      "main": [
+        [
+          {
+            "node": "Send Telegram Response",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Skipped (Dedup)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

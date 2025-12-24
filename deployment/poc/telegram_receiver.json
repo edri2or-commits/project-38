@@ -1,0 +1,70 @@
+{
+  "name": "Telegram POC Receiver",
+  "active": false,
+  "versionId": "v1-tg-receiver",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "telegram-bot",
+        "httpMethod": "POST",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "tg-webhook",
+      "name": "Telegram Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [250, 300],
+      "webhookId": "telegram-bot"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Dedup by update_id using static data\nconst input = $input.first().json;\nconst update_id = input.update_id;\n\nif (!update_id) {\n  console.log('No update_id in payload');\n  return [{ json: { status: 'ignored', reason: 'no_update_id' } }];\n}\n\n// Get static data for dedup tracking\nconst staticData = $getWorkflowStaticData('global');\nif (!staticData.processed_ids) {\n  staticData.processed_ids = [];\n}\n\n// Check if already processed\nif (staticData.processed_ids.includes(update_id)) {\n  console.log('Duplicate update_id:', update_id);\n  return [{ json: { status: 'skipped', reason: 'duplicate', update_id } }];\n}\n\n// Mark as processed (keep last 100)\nstaticData.processed_ids.push(update_id);\nif (staticData.processed_ids.length > 100) {\n  staticData.processed_ids.shift();\n}\n\n// Extract message info\nconst message = input.message || input.edited_message || {};\nconst chat_id = message.chat?.id;\nconst text = message.text || '';\nconst from = message.from?.first_name || 'Unknown';\n\nconsole.log('Processed update:', update_id, 'from:', from, 'text:', text);\n\nreturn [{\n  json: {\n    status: 'processed',\n    update_id,\n    chat_id,\n    from,\n    text_received: text\n  }\n}];"
+      },
+      "id": "dedup-code",
+      "name": "Dedup and Log",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "respond",
+      "name": "Respond OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [650, 300]
+    }
+  ],
+  "connections": {
+    "Telegram Webhook": {
+      "main": [
+        [
+          {
+            "node": "Dedup and Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dedup and Log": {
+      "main": [
+        [
+          {
+            "node": "Respond OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

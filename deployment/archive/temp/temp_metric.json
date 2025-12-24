@@ -1,0 +1,9 @@
+{
+  "filter": "resource.type=\"cloud_run_revision\"\nresource.labels.service_name=\"github-webhook-receiver\"\ntextPayload:\"Unknown command\"",
+  "metricDescriptor": {
+    "metricKind": "DELTA",
+    "valueType": "INT64",
+    "displayName": "TEMP: Unknown Command Test",
+    "description": "Temporary metric to test email delivery. DELETE after test."
+  }
+}

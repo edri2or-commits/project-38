@@ -1,0 +1,31 @@
+﻿{
+    "displayName":  "TEMP: Unknown Command Email Test",
+    "alertStrategy":  {
+                          "autoClose":  "604800s"
+                      },
+    "combiner":  "OR",
+    "notificationChannels":  [
+                                 "projects/project-38-ai/notificationChannels/10887559702060583593"
+                             ],
+    "conditions":  [
+                       {
+                           "displayName":  "Unknown command detected",
+                           "conditionThreshold":  {
+                                                      "filter":  "resource.type=\"cloud_run_revision\" AND metric.type=\"logging.googleapis.com/user/temp-unknown-command-test\"",
+                                                      "duration":  "0s",
+                                                      "aggregations":  [
+                                                                           {
+                                                                               "alignmentPeriod":  "60s",
+                                                                               "perSeriesAligner":  "ALIGN_RATE"
+                                                                           }
+                                                                       ],
+                                                      "thresholdValue":  0,
+                                                      "comparison":  "COMPARISON_GT"
+                                                  }
+                       }
+                   ],
+    "enabled":  true,
+    "documentation":  {
+                          "content":  "TEMPORARY alert to test email delivery. DELETE after test completes."
+                      }
+}
