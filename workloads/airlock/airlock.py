@@ -167,7 +167,7 @@ def enqueue_task(payload, correlation_id, source):
         'payload_type': task_payload['type']
     }
 
-@app.route('/webhook', methods=['POST'])
+@app.route('/webhook/github', methods=['POST'])
 def webhook_github():
     """GitHub webhook endpoint (issue_comment events)."""
     

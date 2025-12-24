@@ -1,0 +1,1 @@
+C:\Users\edri2\AppData\Local\Google\Cloud SDK\google-cloud-sdk\bin\gcloud.ps1

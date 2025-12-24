@@ -51,15 +51,8 @@ def get_secret(secret_name):
         raise
 
 def get_github_app_private_key():
-    """Retrieve GitHub App private key from environment variable.
-    
-    Note: Cloud Run injects the secret content directly into the env var
-    via secretKeyRef, so we read it directly rather than calling Secret Manager.
-    """
-    private_key = os.environ.get('GITHUB_APP_PRIVATE_KEY_SECRET')
-    if not private_key:
-        raise ValueError("GITHUB_APP_PRIVATE_KEY_SECRET not configured")
-    return private_key
+    """Retrieve GitHub App private key."""
+    return get_secret(GITHUB_APP_PRIVATE_KEY_SECRET)
 
 def generate_app_jwt():
     """Generate GitHub App JWT for authentication."""
@@ -355,7 +348,7 @@ _Processing with LLM..._
         logger.error(f"Failed to send Telegram response: {e.__class__.__name__}")
         raise
 
-@app.route('/', methods=['POST'])
+@app.route('/worker', methods=['POST'])
 def worker():
     """
     Worker endpoint - processes tasks from Cloud Tasks queue.

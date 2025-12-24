@@ -22,6 +22,12 @@ docs/evidence/dumps/
 .env.local
 .env.*.local
 
+# Secret files (never commit)
+*.txt.secret
+*token*.txt
+*auth*.txt
+*secret*.txt
+
 # GCP Service Account Keys
 *-service-account-key.json
 *-sa-key.json
