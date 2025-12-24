@@ -1,7 +1,6 @@
-name: 🌉 Issue Trigger Bridge
+name: 🌉 Issue Trigger Bridge v2
 
-# IssueOps Bridge: Converts Issue #24 comments into workflow triggers
-# Research: Zero-Touch AgentOps - Using platform events to bypass API limitations
+# Fixed: Uses GitHub API directly instead of gh CLI
 
 on:
   issue_comment:
@@ -32,46 +31,28 @@ jobs:
             echo "✅ Bootstrap trigger detected"
           fi
 
-      - name: Trigger Self-Deploying Bootstrap
+      - name: Trigger Self-Deploying Bootstrap via API
         if: steps.parse.outputs.command == 'bootstrap'
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
-          echo "🚀 Triggering self-deploying-bootstrap.yml..."
+          echo "🚀 Triggering self-deploying-bootstrap.yml via GitHub API..."
           
-          gh workflow run self-deploying-bootstrap.yml \
-            --repo ${{ github.repository }} \
-            --ref main
+          curl -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${{ github.token }}" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            https://api.github.com/repos/${{ github.repository }}/actions/workflows/self-deploying-bootstrap.yml/dispatches \
+            -d '{"ref":"main"}'
           
-          echo "✅ Workflow triggered successfully"
+          echo "✅ Workflow dispatch request sent"
 
       - name: Confirm Trigger
         if: steps.parse.outputs.command == 'bootstrap'
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
-          gh issue comment 24 \
-            --repo ${{ github.repository }} \
-            --body "## 🚀 Autonomous Bootstrap Triggered
-
-**Trigger received from:** @${{ github.event.comment.user.login }}
-**Time:** $(date -u +"%Y-%m-%d %H:%M:%S UTC")
-
----
-
-The Self-Deploying Bootstrap Agent is now running.
-
-**Track progress:**
-https://github.com/${{ github.repository }}/actions/workflows/self-deploying-bootstrap.yml
-
-**What happens next:**
-1. Phase 1: System generates all deployment code
-2. Phase 2: System posts deployment plan HERE
-3. Phase 3: Waiting for your APPROVED comment
-4. Phase 4: System deploys Railway Broker to GCP
-
----
-
-**Zero human intervention beyond this point.**
-
-*Triggered autonomously via IssueOps Bridge*"
+          curl -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${{ github.token }}" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            https://api.github.com/repos/${{ github.repository }}/issues/24/comments \
+            -d '{
+              "body": "## 🚀 Autonomous Bootstrap Triggered\n\n**Trigger received from:** @${{ github.event.comment.user.login }}\n**Time:** '"$(date -u +"%Y-%m-%d %H:%M:%S UTC")"'\n\n---\n\nThe Self-Deploying Bootstrap Agent is now running.\n\n**Track progress:**\nhttps://github.com/${{ github.repository }}/actions/workflows/self-deploying-bootstrap.yml\n\n**What happens next:**\n1. Phase 1: System generates all deployment code\n2. Phase 2: System posts deployment plan HERE  \n3. Phase 3: System deploys Railway Broker to GCP\n\n---\n\n**Zero human intervention beyond this point.**\n\n*Triggered autonomously via IssueOps Bridge v2 (API)*"
+            }'
