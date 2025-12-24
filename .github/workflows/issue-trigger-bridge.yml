@@ -1,0 +1,77 @@
+name: 🌉 Issue Trigger Bridge
+
+# IssueOps Bridge: Converts Issue #24 comments into workflow triggers
+# Research: Zero-Touch AgentOps - Using platform events to bypass API limitations
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  actions: write
+  contents: read
+  issues: write
+
+jobs:
+  bridge-trigger:
+    if: github.event.issue.number == 24
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Parse Trigger Command
+        id: parse
+        env:
+          COMMENT: ${{ github.event.comment.body }}
+          ACTOR: ${{ github.event.comment.user.login }}
+        run: |
+          echo "Comment from: $ACTOR"
+          echo "Comment body: $COMMENT"
+          
+          if echo "$COMMENT" | grep -qi "TRIGGER_BOOTSTRAP"; then
+            echo "command=bootstrap" >> $GITHUB_OUTPUT
+            echo "✅ Bootstrap trigger detected"
+          fi
+
+      - name: Trigger Self-Deploying Bootstrap
+        if: steps.parse.outputs.command == 'bootstrap'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "🚀 Triggering self-deploying-bootstrap.yml..."
+          
+          gh workflow run self-deploying-bootstrap.yml \
+            --repo ${{ github.repository }} \
+            --ref main
+          
+          echo "✅ Workflow triggered successfully"
+
+      - name: Confirm Trigger
+        if: steps.parse.outputs.command == 'bootstrap'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue comment 24 \
+            --repo ${{ github.repository }} \
+            --body "## 🚀 Autonomous Bootstrap Triggered
+
+**Trigger received from:** @${{ github.event.comment.user.login }}
+**Time:** $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+
+---
+
+The Self-Deploying Bootstrap Agent is now running.
+
+**Track progress:**
+https://github.com/${{ github.repository }}/actions/workflows/self-deploying-bootstrap.yml
+
+**What happens next:**
+1. Phase 1: System generates all deployment code
+2. Phase 2: System posts deployment plan HERE
+3. Phase 3: Waiting for your APPROVED comment
+4. Phase 4: System deploys Railway Broker to GCP
+
+---
+
+**Zero human intervention beyond this point.**
+
+*Triggered autonomously via IssueOps Bridge*"
