@@ -1,6 +1,5 @@
 name: 🤖 Self-Deploying Bootstrap Agent
 
-# WORKAROUND: Push trigger bypasses GITHUB_TOKEN limitation
 on:
   workflow_dispatch:
   push:
@@ -14,6 +13,7 @@ permissions:
 
 env:
   PROJECT_ID: 'project-38-ai'
+  GCP_PROJECT_NUMBER: '349474278719'
   CONTROL_ROOM_ISSUE: 24
   GCP_REGION: 'us-central1'
 
@@ -120,13 +120,20 @@ jobs:
           Push to workflow = autonomous deployment
           EOF
       
-      - name: Commit Files
+      - name: Upload Deployment Files
+        uses: actions/upload-artifact@v4
+        with:
+          name: deployment-files
+          path: deployment/
+          retention-days: 1
+      
+      - name: Commit Files to Repo
         run: |
           git config user.name "project-38-scribe[bot]"
           git config user.email "bot@users.noreply.github.com"
           git add deployment/ docs/
           if ! git diff --staged --quiet; then
-            git commit -m "feat: Bootstrap infrastructure"
+            git commit -m "feat: Bootstrap infrastructure [skip ci]"
             git push
           fi
 
@@ -134,18 +141,28 @@ jobs:
     needs: provision-files
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: google-github-actions/auth@v2
+      - name: Download Deployment Files
+        uses: actions/download-artifact@v4
         with:
-          workload_identity_provider: 'projects/${{ secrets.GCP_PROJECT_NUMBER }}/locations/global/workloadIdentityPools/github-actions-pool/providers/github-actions-provider'
-          service_account: 'github-actions-infra@${{ env.PROJECT_ID }}.iam.gserviceaccount.com'
-      - uses: google-github-actions/setup-gcloud@v2
+          name: deployment-files
+          path: deployment/
       
-      - name: Deploy
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: 'projects/${{ env.GCP_PROJECT_NUMBER }}/locations/global/workloadIdentityPools/github-actions-pool/providers/github-actions-provider'
+          service_account: 'github-actions-infra@${{ env.PROJECT_ID }}.iam.gserviceaccount.com'
+      
+      - name: Setup Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+      
+      - name: Build and Deploy
         run: |
           cd deployment/broker
           IMAGE="gcr.io/${{ env.PROJECT_ID }}/railway-identity-broker:latest"
-          gcloud auth configure-docker -q
+          
+          gcloud auth configure-docker gcr.io --quiet
+          
           docker build -t "$IMAGE" .
           docker push "$IMAGE"
           
@@ -157,14 +174,28 @@ jobs:
             --no-allow-unauthenticated \
             --memory=2Gi \
             --cpu=2 \
-            --max-instances=1
+            --max-instances=1 \
+            --timeout=300
       
-      - name: Report
+      - name: Report to Issue
+        if: success()
         run: |
-          URL=$(gcloud run services describe railway-identity-broker --project=${{ env.PROJECT_ID }} --region=${{ env.GCP_REGION }} --format="value(status.url)")
+          URL=$(gcloud run services describe railway-identity-broker \
+            --project=${{ env.PROJECT_ID }} \
+            --region=${{ env.GCP_REGION }} \
+            --format="value(status.url)")
           
           curl -X POST \
             -H "Authorization: Bearer ${{ github.token }}" \
             -H "Accept: application/vnd.github+json" \
             https://api.github.com/repos/${{ github.repository }}/issues/24/comments \
-            -d "{\"body\":\"## ✅ OPERATIONAL\n\n**Broker URL:** ${URL}\n**Status:** LIVE\n\n*Zero-Touch complete.*\"}"
+            -d "{\"body\":\"## ✅ OPERATIONAL\n\n**Service:** Railway Identity Broker\n**URL:** ${URL}\n**Region:** ${{ env.GCP_REGION }}\n**Status:** LIVE\n\n---\n\n**Deployment Evidence:**\n- Container: \`gcr.io/${{ env.PROJECT_ID }}/railway-identity-broker:latest\`\n- Memory: 2GB\n- CPU: 2\n- Auth: Service Account\n\n*Zero-Touch deployment complete. Total time: ~5 minutes.*\"}"
+      
+      - name: Report Failure
+        if: failure()
+        run: |
+          curl -X POST \
+            -H "Authorization: Bearer ${{ github.token }}" \
+            -H "Accept: application/vnd.github+json" \
+            https://api.github.com/repos/${{ github.repository }}/issues/24/comments \
+            -d "{\"body\":\"## ❌ Deployment Failed\n\n**Workflow Run:** ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\n\nCheck logs for details.\"}"
