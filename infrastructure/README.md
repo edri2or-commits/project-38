@@ -29,19 +29,47 @@ Before deployment, you **must** configure the following environment variables in
 **\*Note:** At least ONE LLM provider API key is required for Dify to function. You can add more providers later.
 
 ---
-## 🔐 Generating Secure Values
 
-### Strong Passwords (POSTGRES_PASSWORD, REDIS_PASSWORD)
+## 🔐 Environment Configuration
+
+### Automated Setup (RECOMMENDED)
+
+**Use the Setup Wizard for zero-touch configuration:**
+
+```powershell
+# Navigate to project root
+cd C:\Users\edri2\project_38
+
+# Run interactive setup wizard
+.\scripts\deployment\setup_env.ps1
+```
+
+**The wizard will:**
+- ✅ Auto-generate all secure passwords
+- ✅ Prompt for LLM API key(s)
+- ✅ Create `.env.production` file
+- ✅ Optionally deploy to Railway
+
+**See:** [Setup Wizard Guide](../scripts/deployment/README_setup_env.md)
+
+### Manual Generation (Alternative)
+
+<details>
+<summary>Click to expand manual password generation</summary>
+
+#### Strong Passwords (POSTGRES_PASSWORD, REDIS_PASSWORD)
 ```bash
 # Generate a 32-character random password
 openssl rand -base64 32
 ```
 
-### Secret Key (SECRET_KEY)
+#### Secret Key (SECRET_KEY)
 ```bash
 # Generate a 64-character secret key
 openssl rand -hex 32
 ```
+
+</details>
 
 ---
 

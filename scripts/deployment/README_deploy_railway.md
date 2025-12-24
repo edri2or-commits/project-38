@@ -22,8 +22,8 @@ Fully automated PowerShell script for deploying Dify to Railway with **zero manu
 ### Required Files
 
 1. **`.env.production`** in `infrastructure/` directory
-   - Copy from `infrastructure/.env.template`
-   - Fill in all required values
+   - **RECOMMENDED:** Use Setup Wizard (see Quick Start below)
+   - **ALTERNATIVE:** Manual creation from template (not recommended)
    - **NEVER commit this file to Git** (already in .gitignore)
 
 ### Optional Tools (Script will install if missing)
@@ -35,7 +35,34 @@ Fully automated PowerShell script for deploying Dify to Railway with **zero manu
 
 ---
 
-## 🚀 Quick Start
+## 🚀 Quick Start (RECOMMENDED)
+
+### Zero-Touch Setup (One Command)
+
+```powershell
+# Navigate to project root
+cd C:\Users\edri2\project_38
+
+# Run interactive setup wizard
+.\scripts\deployment\setup_env.ps1
+```
+
+**The wizard will:**
+1. ✅ Auto-generate secure passwords (32-64 chars)
+2. ✅ Prompt for your LLM API key(s)
+3. ✅ Create `.env.production` automatically
+4. ✅ Optionally deploy to Railway immediately
+
+**Time:** ~5 minutes total
+
+**See:** [Setup Wizard Guide](README_setup_env.md)
+
+---
+
+## 🔧 Alternative: Manual Setup (NOT RECOMMENDED)
+
+<details>
+<summary>Click to expand manual setup instructions</summary>
 
 ### Step 1: Create Environment File
 
@@ -69,6 +96,8 @@ cd C:\Users\edri2\project_38
 # Execute deployment script
 .\scripts\deployment\deploy_railway.ps1
 ```
+
+</details>
 
 ---
 
