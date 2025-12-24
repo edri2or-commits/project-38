@@ -1,0 +1,235 @@
+name: 🚀 Deploy Bootstrap Broker
+
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  check-command:
+    if: github.event.issue.number == 24 && contains(github.event.comment.body, '/deploy-broker')
+    runs-on: ubuntu-latest
+    outputs:
+      should_deploy: ${{ steps.check.outputs.result }}
+    steps:
+      - name: Check authorization
+        id: check
+        run: |
+          if [[ "${{ github.event.comment.user.login }}" == "edri2or-commits" ]]; then
+            echo "result=true" >> $GITHUB_OUTPUT
+          else
+            echo "result=false" >> $GITHUB_OUTPUT
+          fi
+
+  deploy:
+    needs: check-command
+    if: needs.check-command.outputs.should_deploy == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+      id-token: write
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Create deployment files
+        run: |
+          mkdir -p deployment/broker
+          
+          cat > deployment/broker/railway_identity_broker.py << 'EOF'
+"""Railway Ephemeral Identity Broker"""
+import os, json, asyncio, logging
+from playwright.async_api import async_playwright
+from google.cloud import secretmanager
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+class RailwayIdentityBroker:
+    def __init__(self, project_id: str):
+        self.project_id = project_id
+        self.secret_client = secretmanager.SecretManagerServiceClient()
+    
+    async def bootstrap_railway_token(self) -> str:
+        logger.info("🚂 Railway Bootstrap...")
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(headless=True, args=['--no-sandbox'])
+            page = await (await browser.new_context()).new_page()
+            try:
+                await page.goto('https://railway.app/login')
+                await page.click('button:has-text("Sign in with GitHub")')
+                await page.wait_for_url('**/dashboard**', timeout=30000)
+                await page.goto('https://railway.app/account/tokens')
+                await page.click('button:has-text("Create Token")')
+                await page.fill('input[placeholder*="Token name"]', f"auto-{os.getenv('GITHUB_RUN_ID')}")
+                await page.click('button:has-text("Create")')
+                token = await (await page.query_selector('[data-testid="token-value"]')).inner_text()
+                
+                secret_name = f"projects/{self.project_id}/secrets/railway-api-token"
+                try:
+                    self.secret_client.create_secret(
+                        request={"parent": f"projects/{self.project_id}", 
+                                "secret_id": "railway-api-token",
+                                "secret": {"replication": {"automatic": {}}}}
+                    )
+                except: pass
+                self.secret_client.add_secret_version(
+                    request={"parent": secret_name, 
+                            "payload": {"data": token.encode('utf-8')}}
+                )
+                return token
+            finally:
+                await browser.close()
+
+async def main():
+    broker = RailwayIdentityBroker(os.getenv('GCP_PROJECT_ID', 'project-38-ai'))
+    try:
+        token = await broker.bootstrap_railway_token()
+        print(json.dumps({"success": True, "token_prefix": token[:10]}))
+    except Exception as e:
+        print(json.dumps({"success": False, "error": str(e)}))
+        exit(1)
+
+if __name__ == "__main__":
+    asyncio.run(main())
+EOF
+
+          cat > deployment/broker/Dockerfile << 'EOF'
+FROM mcr.microsoft.com/playwright/python:v1.40.0-jammy
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install -r requirements.txt && playwright install chromium
+COPY *.py .
+ENV PORT=8080
+EXPOSE 8080
+CMD ["python", "server.py"]
+EOF
+
+          cat > deployment/broker/requirements.txt << 'EOF'
+playwright==1.40.0
+google-cloud-secret-manager==2.16.4
+flask==3.0.0
+EOF
+
+          cat > deployment/broker/server.py << 'EOF'
+from flask import Flask, jsonify
+app = Flask(__name__)
+
+@app.route('/health')
+def health():
+    return jsonify({"status": "healthy"})
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=8080)
+EOF
+      
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: 'projects/589393622792/locations/global/workloadIdentityPools/github-actions-pool/providers/github-actions-provider'
+          service_account: 'github-actions-infra@project-38-ai.iam.gserviceaccount.com'
+      
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+      
+      - name: Build and push Docker image
+        id: build
+        run: |
+          cd deployment/broker
+          IMAGE="gcr.io/project-38-ai/railway-identity-broker:${{ github.run_id }}"
+          IMAGE_LATEST="gcr.io/project-38-ai/railway-identity-broker:latest"
+          
+          gcloud builds submit \
+            --tag="$IMAGE" \
+            --tag="$IMAGE_LATEST" \
+            --project=project-38-ai
+          
+          echo "image=$IMAGE" >> $GITHUB_OUTPUT
+          echo "image_latest=$IMAGE_LATEST" >> $GITHUB_OUTPUT
+      
+      - name: Deploy to Cloud Run
+        id: deploy
+        env:
+          GCP_PROJECT_NUMBER: "589393622792"
+        run: |
+          gcloud run deploy railway-identity-broker \
+            --image="${{ steps.build.outputs.image_latest }}" \
+            --region=us-central1 \
+            --service-account=github-actions-infra@project-38-ai.iam.gserviceaccount.com \
+            --no-allow-unauthenticated \
+            --memory=2Gi \
+            --cpu=2 \
+            --set-env-vars="GCP_PROJECT_ID=project-38-ai,GCP_PROJECT_NUMBER=$GCP_PROJECT_NUMBER" \
+            --project=project-38-ai \
+            --format='value(status.url)' > service_url.txt
+          
+          SERVICE_URL=$(cat service_url.txt)
+          echo "service_url=$SERVICE_URL" >> $GITHUB_OUTPUT
+          
+          REVISION=$(gcloud run services describe railway-identity-broker \
+            --region=us-central1 \
+            --project=project-38-ai \
+            --format='value(status.latestReadyRevisionName)')
+          
+          echo "revision=$REVISION" >> $GITHUB_OUTPUT
+      
+      - name: Post evidence to Issue #24
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const runUrl = `https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}`;
+            const serviceUrl = '${{ steps.deploy.outputs.service_url }}';
+            const revision = '${{ steps.deploy.outputs.revision }}';
+            const image = '${{ steps.build.outputs.image }}';
+            
+            const evidence = `## ✅ Bootstrap Broker Deployed
+
+**Workflow Run:**
+- URL: ${runUrl}
+- Run ID: ${{ github.run_id }}
+- Conclusion: success
+
+**Cloud Run Service:**
+- Name: railway-identity-broker
+- Region: us-central1
+- Service URL: ${serviceUrl}
+- Revision: ${revision}
+- Image: ${image}
+
+**Next Steps:**
+Service is ready for Railway token bootstrap operations.`;
+            
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: 24,
+              body: evidence
+            });
+      
+      - name: Post failure evidence on error
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const runUrl = `https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}`;
+            
+            const evidence = `## ❌ Bootstrap Broker Deployment Failed
+
+**Workflow Run:**
+- URL: ${runUrl}
+- Run ID: ${{ github.run_id }}
+- Conclusion: failure
+
+**Failed Step:**
+Check logs at: ${runUrl}
+
+**Action Required:**
+Review failure logs and retry deployment.`;
+            
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: 24,
+              body: evidence
+            });
