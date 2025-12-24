@@ -1,75 +1,90 @@
 # Dify on Railway - Infrastructure Deployment
 
-Deploy Dify (Community Edition) to Railway with one click using this pre-configured infrastructure setup.
+Deploy Dify (Community Edition) to Railway via **GitHub Actions** with automated secret management from GCP Secret Manager.
 
 ---
 
 ## 🚀 Quick Deploy
 
-[![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/new/template?template=https://github.com/edri2or-commits/project-38&envs=POSTGRES_USER,POSTGRES_PASSWORD,POSTGRES_DB,REDIS_PASSWORD,SECRET_KEY,OPENAI_API_KEY,ANTHROPIC_API_KEY)
+### Deployment via GitHub Actions (RECOMMENDED)
 
-Click the button above to deploy Dify to Railway automatically.
+**Zero-Touch Deployment with GCP Secret Manager Integration:**
+
+1. **Prerequisites:**
+   - ✅ `RAILWAY_TOKEN` configured in GitHub Secrets
+   - ✅ `RAILWAY_PROJECT_ID` configured in GitHub Secrets
+   - ✅ GCP Workload Identity Federation configured (from Phase 1)
+   - ✅ `OPENAI_API_KEY` stored in GCP Secret Manager
+
+2. **Deploy:**
+   - Go to: [GitHub Actions - Deploy to Railway](https://github.com/edri2or-commits/project-38/actions/workflows/deploy-railway.yml)
+   - Click **"Run workflow"**
+   - Select environment (production/staging)
+   - Click **"Run workflow"** button
+
+**The workflow will automatically:**
+- 🔐 Authenticate to GCP via Workload Identity Federation
+- 🔍 Fetch `OPENAI_API_KEY` and `ANTHROPIC_API_KEY` from Secret Manager
+- 🔑 Generate secure passwords for PostgreSQL, Redis, SECRET_KEY
+- 🚀 Deploy to Railway with all variables configured
+- ✅ Report deployment status in GitHub Actions summary
+
+**Time:** ~2-3 minutes, **ZERO manual configuration!** ✨
 
 ---
 
-## 📋 Required Environment Variables
+## 📋 Environment Variables
 
-Before deployment, you **must** configure the following environment variables in Railway:
+All environment variables are **automatically configured** by the GitHub Actions workflow:
 
-| Variable | Description | Example | Required |
-|----------|-------------|---------|----------|
-| `POSTGRES_USER` | PostgreSQL database username | `dify` | ✅ Yes |
-| `POSTGRES_PASSWORD` | PostgreSQL database password (strong password) | `[generate-secure-password]` | ✅ Yes |
-| `POSTGRES_DB` | PostgreSQL database name | `dify` | ✅ Yes |
-| `REDIS_PASSWORD` | Redis password for cache/queue | `[generate-secure-password]` | ✅ Yes |
-| `SECRET_KEY` | Dify secret key for session encryption | `[generate-secret-64-chars]` | ✅ Yes |
-| `OPENAI_API_KEY` | OpenAI API key for GPT models | `sk-...` | ⚠️ Optional* |
-| `ANTHROPIC_API_KEY` | Anthropic API key for Claude models | `sk-ant-...` | ⚠️ Optional* |
+| Variable | Source | Auto-Generated |
+|----------|--------|----------------|
+| `POSTGRES_USER` | Hardcoded (`dify`) | N/A |
+| `POSTGRES_PASSWORD` | OpenSSL random | ✅ Yes |
+| `POSTGRES_DB` | Hardcoded (`dify`) | N/A |
+| `REDIS_PASSWORD` | OpenSSL random | ✅ Yes |
+| `SECRET_KEY` | OpenSSL random | ✅ Yes |
+| `OPENAI_API_KEY` | GCP Secret Manager | 🔍 Auto-discovered |
+| `ANTHROPIC_API_KEY` | GCP Secret Manager | 🔍 Auto-discovered |
 
-**\*Note:** At least ONE LLM provider API key is required for Dify to function. You can add more providers later.
+**No manual password generation required!**
 
 ---
 
-## 🔐 Environment Configuration
+## 🔐 One-Time Setup
 
-### Automated Setup (RECOMMENDED)
+### 1. GitHub Secrets Configuration
 
-**Use the Setup Wizard for zero-touch configuration:**
+Add the following secrets to your GitHub repository:
 
-```powershell
-# Navigate to project root
-cd C:\Users\edri2\project_38
-
-# Run interactive setup wizard
-.\scripts\deployment\setup_env.ps1
-```
-
-**The wizard will:**
-- ✅ Auto-generate all secure passwords
-- ✅ Prompt for LLM API key(s)
-- ✅ Create `.env.production` file
-- ✅ Optionally deploy to Railway
-
-**See:** [Setup Wizard Guide](../scripts/deployment/README_setup_env.md)
-
-### Manual Generation (Alternative)
-
-<details>
-<summary>Click to expand manual password generation</summary>
-
-#### Strong Passwords (POSTGRES_PASSWORD, REDIS_PASSWORD)
 ```bash
-# Generate a 32-character random password
-openssl rand -base64 32
+# Required secrets
+RAILWAY_TOKEN         # Get from: https://railway.app/account/tokens
+RAILWAY_PROJECT_ID    # Get from Railway project settings
 ```
 
-#### Secret Key (SECRET_KEY)
+**How to add secrets:**
+1. Go to: `Settings` → `Secrets and variables` → `Actions`
+2. Click **"New repository secret"**
+3. Add `RAILWAY_TOKEN` and `RAILWAY_PROJECT_ID`
+
+### 2. GCP Secret Manager Setup (One-Time)
+
+Store your LLM API keys in GCP Secret Manager:
+
 ```bash
-# Generate a 64-character secret key
-openssl rand -hex 32
+# Store OpenAI key (required)
+echo -n "sk-proj-..." | gcloud secrets create openai-api-key \
+  --data-file=- \
+  --project=project-38-ai
+
+# Store Anthropic key (optional)
+echo -n "sk-ant-..." | gcloud secrets create anthropic-api-key \
+  --data-file=- \
+  --project=project-38-ai
 ```
 
-</details>
+**After this setup:** Every deployment runs with ZERO manual input! 🎉
 
 ---
 
@@ -91,6 +106,7 @@ redis ─────┘               └──> dify-worker
 ```
 
 ---
+
 ## 📦 Persistent Storage
 
 ### PostgreSQL Volume
@@ -120,42 +136,50 @@ After deployment completes (~5 minutes):
 - API: `https://<dify-api-railway-domain>.railway.app`
 
 ---
-## 🔧 Configuration Notes
 
-### Environment Variable References
+## 🔧 Advanced Configuration
 
-Railway automatically provides these variables for service discovery:
+### Trigger Deployment on Push to Main
 
-- `${{RAILWAY_PRIVATE_DOMAIN_POSTGRES}}` - Internal PostgreSQL hostname
-- `${{RAILWAY_PRIVATE_DOMAIN_REDIS}}` - Internal Redis hostname
-- `${{RAILWAY_PUBLIC_DOMAIN_DIFY_API}}` - Public API domain (for frontend)
+The workflow is configured to **automatically deploy** on pushes to `main` branch (excluding documentation changes):
 
-### Networking
+```yaml
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - 'docs/**'
+      - '**.md'
+```
 
-Services communicate over Railway's **private network** using:
-- PostgreSQL: Port `5432` (internal only)
-- Redis: Port `6379` (internal only)
-- Dify API: Port `5001` (public + internal)
-- Dify Web: Port `3000` (public)
+**To enable:** Just push to `main` - deployment runs automatically! 🚀
+
+### Deploy to Staging Environment
+
+```bash
+# Manual workflow dispatch with staging environment
+gh workflow run deploy-railway.yml -f environment=staging
+```
+
+### View Deployment Status
+
+Check deployment progress:
+- **GitHub Actions:** https://github.com/edri2or-commits/project-38/actions/workflows/deploy-railway.yml
+- **Railway Dashboard:** https://railway.app/project/<PROJECT_ID>
 
 ---
 
-## 🛠️ Manual Deployment (Alternative)
-
-If you prefer manual deployment:
-
-1. **Fork this repository**
-2. **Create a new Railway project**
-3. **Add services from the `infrastructure/railway.json` file**
-4. **Configure environment variables** in Railway dashboard
-5. **Deploy each service** in dependency order:
-   - postgres → redis → dify-api → dify-worker, dify-web
-
----
 ## 🔄 Updating Dify
 
 To update Dify to the latest version:
 
+**Option 1: Via GitHub Actions (Recommended)**
+1. Go to GitHub Actions → Deploy to Railway
+2. Click "Run workflow"
+3. Deployment will pull latest images automatically
+
+**Option 2: Via Railway Dashboard**
 1. Go to Railway dashboard → Select service
 2. Click **"Redeploy"** for:
    - `dify-api`
@@ -166,6 +190,17 @@ To update Dify to the latest version:
 ---
 
 ## 🐛 Troubleshooting
+
+### Workflow Failures
+
+**Issue:** "RAILWAY_TOKEN not set"  
+**Solution:** Add `RAILWAY_TOKEN` to GitHub Secrets (Settings → Secrets and variables → Actions)
+
+**Issue:** "GCP auth failed"  
+**Solution:** Verify Workload Identity Federation is configured correctly (from Phase 1)
+
+**Issue:** "Secret not found in GCP Secret Manager"  
+**Solution:** Run the GCP setup commands above to create secrets
 
 ### Service Health Checks
 
@@ -179,30 +214,67 @@ All services include health checks:
 ### Common Issues
 
 **Issue:** "Database connection failed"  
-**Solution:** Check `POSTGRES_*` environment variables match between services
+**Solution:** Check GitHub Actions logs - passwords are auto-generated and set correctly
 
 **Issue:** "Redis connection refused"  
-**Solution:** Verify `REDIS_PASSWORD` is set correctly in all services
+**Solution:** Wait 2-3 minutes for all services to start, check Railway logs
 
 **Issue:** "Frontend shows 502 Bad Gateway"  
 **Solution:** Wait 2-3 minutes for API service to fully start, check API health
 
 ---
+
 ## 📚 Additional Resources
 
+- **GitHub Actions Workflow:** [.github/workflows/deploy-railway.yml](../.github/workflows/deploy-railway.yml)
 - **Dify Official Docs:** https://docs.dify.ai
 - **Railway Docs:** https://docs.railway.app
+- **GCP Secret Manager:** https://cloud.google.com/secret-manager
 - **Support:** Open an issue in this repository
 
 ---
 
-## ⚠️ Security Best Practices
+## 🔒 Security Features
+
+### Automated Security Hardening
+
+✅ **Zero secrets in Git:** All credentials fetched from GCP Secret Manager  
+✅ **OIDC/WIF authentication:** No static GCP credentials in GitHub  
+✅ **Cryptographically secure passwords:** Generated with `openssl rand`  
+✅ **Secrets masking:** GitHub Actions masks all sensitive values in logs  
+✅ **Least privilege:** `github-actions-deployer` SA has minimal required permissions  
+✅ **Audit trail:** All deployments logged in GitHub Actions history  
+
+### Best Practices
 
 1. ✅ **Never commit** `.env` files or secrets to Git
-2. ✅ **Use strong passwords** (minimum 32 characters)
-3. ✅ **Rotate secrets** regularly (every 90 days)
-4. ✅ **Enable Railway's private networking** for service communication
-5. ✅ **Use environment variables** for ALL configuration
+2. ✅ **Use GitHub Secrets** for Railway credentials
+3. ✅ **Store LLM keys** in GCP Secret Manager
+4. ✅ **Rotate secrets** regularly (every 90 days)
+5. ✅ **Review deployment logs** for security warnings
+
+---
+
+## 🚀 Workflow Comparison
+
+### Before (Manual Scripts)
+```powershell
+# 1. Run setup wizard locally
+.\scripts\deployment\setup_env.ps1
+
+# 2. Provide API keys manually
+OPENAI_API_KEY: <type sk-...>
+
+# 3. Run deployment script
+.\scripts\deployment\deploy_railway.ps1
+```
+**Time:** ~5-10 minutes, requires local `gcloud` CLI
+
+### After (GitHub Actions)
+```bash
+# Click "Run workflow" in GitHub UI
+```
+**Time:** ~2-3 minutes, ZERO local dependencies! ✨
 
 ---
 
