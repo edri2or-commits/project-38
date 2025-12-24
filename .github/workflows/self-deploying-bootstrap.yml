@@ -1,4 +1,5 @@
 name: 🤖 Self-Deploying Bootstrap Agent
+# Force trigger: 2025-12-24T10:53Z
 
 on:
   workflow_dispatch:
