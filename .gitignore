@@ -21,6 +21,7 @@ docs/evidence/dumps/
 .env
 .env.local
 .env.*.local
+.env.production
 
 # Secret files (never commit)
 *.txt.secret
@@ -31,6 +32,9 @@ docs/evidence/dumps/
 # GCP Service Account Keys
 *-service-account-key.json
 *-sa-key.json
+
+# Railway Configuration (local only)
+.railway/
 
 # Local Development
 .vscode/
