@@ -1,21 +1,26 @@
 # ============================================================================
 # Railway Environment Setup Wizard
-# Project 38 - Zero-Touch Configuration
+# Project 38 - Zero-Touch Configuration (GCP Auto-Discovery)
 # ============================================================================
 # This script automates the entire environment setup process:
-# 1. Auto-generates secure passwords (POSTGRES, REDIS, SECRET_KEY)
-# 2. Interactively requests LLM API keys from user
-# 3. Creates .env.production with all values
-# 4. Optionally chains to deploy_railway.ps1
+# 1. Auto-discovers LLM API keys from GCP Secret Manager (zero-touch)
+# 2. Auto-generates secure passwords (POSTGRES, REDIS, SECRET_KEY)
+# 3. Falls back to interactive prompts if GCP secrets not available
+# 4. Creates .env.production with all values
+# 5. Optionally chains to deploy_railway.ps1
 #
 # Usage: .\setup_env.ps1
-# Requirements: openssl (for password generation) OR PowerShell 5.1+
+# Requirements: 
+#   - gcloud CLI (optional, for auto-discovery)
+#   - openssl (optional, for password generation) OR PowerShell 5.1+
 # ============================================================================
 
 param(
     [switch]$SkipDeploy,
     [switch]$RegenerateAll,
-    [string]$EnvFile = "infrastructure\.env.production"
+    [switch]$SkipGcpDiscovery,
+    [string]$EnvFile = "infrastructure\.env.production",
+    [string]$GcpProject = "project-38-ai"
 )
 
 $ErrorActionPreference = "Stop"
@@ -30,6 +35,57 @@ function Write-Warning { param($Message) Write-Host "⚠️  $Message" -Foregrou
 function Write-Error { param($Message) Write-Host "❌ $Message" -ForegroundColor Red }
 function Write-Step { param($Step, $Message) Write-Host "`n[$Step] $Message" -ForegroundColor Magenta }
 function Write-Secret { param($Message) Write-Host "🔐 $Message" -ForegroundColor Yellow }
+function Write-Discovery { param($Message) Write-Host "🔍 $Message" -ForegroundColor Cyan }
+
+# ============================================================================
+# GCP Secret Manager Auto-Discovery
+# ============================================================================
+function Test-GcloudAvailable {
+    try {
+        $null = gcloud version 2>$null
+        return $LASTEXITCODE -eq 0
+    } catch {
+        return $false
+    }
+}
+
+function Get-GcpSecret {
+    param(
+        [string]$SecretName,
+        [string]$Project = $GcpProject
+    )
+    
+    if ($SkipGcpDiscovery) {
+        return $null
+    }
+    
+    if (-not (Test-GcloudAvailable)) {
+        return $null
+    }
+    
+    # Try multiple naming conventions
+    $namingVariants = @(
+        $SecretName,                              # OPENAI_API_KEY
+        $SecretName.ToLower(),                    # openai_api_key
+        ($SecretName.ToLower() -replace '_', '-') # openai-api-key
+    )
+    
+    foreach ($variant in $namingVariants) {
+        try {
+            Write-Discovery "Trying GCP secret: $variant"
+            $secret = gcloud secrets versions access latest --secret="$variant" --project="$Project" 2>$null
+            
+            if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($secret)) {
+                Write-Success "Found secret in GCP: $variant"
+                return $secret.Trim()
+            }
+        } catch {
+            # Silent fail, try next variant
+        }
+    }
+    
+    return $null
+}
 
 # ============================================================================
 # Password Generation Functions
@@ -110,10 +166,19 @@ function Show-Welcome {
     Write-Host ""
     
     Write-Info "This wizard will:"
-    Write-Host "  1. Generate secure passwords automatically" -ForegroundColor White
-    Write-Host "  2. Request your LLM API key(s)" -ForegroundColor White
+    Write-Host "  1. Auto-discover API keys from GCP Secret Manager" -ForegroundColor White
+    Write-Host "  2. Generate secure passwords automatically" -ForegroundColor White
     Write-Host "  3. Create .env.production file" -ForegroundColor White
     Write-Host "  4. Optionally deploy to Railway" -ForegroundColor White
+    Write-Host ""
+    
+    if (Test-GcloudAvailable -and -not $SkipGcpDiscovery) {
+        Write-Success "gcloud CLI detected - will attempt auto-discovery"
+    } elseif ($SkipGcpDiscovery) {
+        Write-Warning "GCP auto-discovery disabled (--SkipGcpDiscovery)"
+    } else {
+        Write-Warning "gcloud CLI not available - will use interactive prompts"
+    }
     Write-Host ""
     
     if (Test-Path $EnvFile -and -not $RegenerateAll) {
@@ -165,57 +230,92 @@ function New-DatabasePasswords {
 }
 
 # ============================================================================
-# STEP 3: Request API Keys
+# STEP 3: Discover/Request API Keys
 # ============================================================================
 function Get-ApiKeys {
     Write-Step "2/3" "LLM Provider Configuration"
     
-    Write-Info "At least ONE LLM provider API key is required"
-    Write-Host ""
-    
     $apiKeys = @{}
     $hasProvider = $false
     
-    # OpenAI
+    # ========================================
+    # OpenAI Auto-Discovery
+    # ========================================
+    Write-Host ""
     Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor DarkGray
     Write-Host "OpenAI (GPT-4, GPT-3.5)" -ForegroundColor Cyan
-    Write-Host "Format: sk-... (starts with sk-)" -ForegroundColor Gray
-    $openaiKey = Read-Host "OPENAI_API_KEY (press Enter to skip)"
     
-    if (-not [string]::IsNullOrWhiteSpace($openaiKey)) {
+    $openaiKey = Get-GcpSecret -SecretName "OPENAI_API_KEY"
+    
+    if ($openaiKey) {
         if (Test-ApiKey -Key $openaiKey -Provider "OpenAI") {
             $apiKeys["OPENAI_API_KEY"] = $openaiKey
-            Write-Success "OpenAI API key validated"
+            Write-Success "OpenAI API key auto-discovered from GCP ✨"
             $hasProvider = $true
         } else {
-            Write-Warning "OpenAI key format looks incorrect (expected: sk-...)"
-            $continue = Read-Host "Continue anyway? (y/N)"
-            if ($continue -eq "y" -or $continue -eq "Y") {
+            Write-Warning "GCP secret found but format invalid - will prompt manually"
+            $openaiKey = $null
+        }
+    }
+    
+    # Fallback to manual input
+    if (-not $openaiKey) {
+        Write-Host "Format: sk-... (starts with sk-)" -ForegroundColor Gray
+        $openaiKey = Read-Host "OPENAI_API_KEY (press Enter to skip)"
+        
+        if (-not [string]::IsNullOrWhiteSpace($openaiKey)) {
+            if (Test-ApiKey -Key $openaiKey -Provider "OpenAI") {
                 $apiKeys["OPENAI_API_KEY"] = $openaiKey
+                Write-Success "OpenAI API key validated"
                 $hasProvider = $true
+            } else {
+                Write-Warning "OpenAI key format looks incorrect (expected: sk-...)"
+                $continue = Read-Host "Continue anyway? (y/N)"
+                if ($continue -eq "y" -or $continue -eq "Y") {
+                    $apiKeys["OPENAI_API_KEY"] = $openaiKey
+                    $hasProvider = $true
+                }
             }
         }
     }
     
+    # ========================================
+    # Anthropic Auto-Discovery
+    # ========================================
     Write-Host ""
-    
-    # Anthropic
     Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor DarkGray
     Write-Host "Anthropic (Claude 3.5 Sonnet)" -ForegroundColor Cyan
-    Write-Host "Format: sk-ant-... (starts with sk-ant-)" -ForegroundColor Gray
-    $anthropicKey = Read-Host "ANTHROPIC_API_KEY (press Enter to skip)"
     
-    if (-not [string]::IsNullOrWhiteSpace($anthropicKey)) {
+    $anthropicKey = Get-GcpSecret -SecretName "ANTHROPIC_API_KEY"
+    
+    if ($anthropicKey) {
         if (Test-ApiKey -Key $anthropicKey -Provider "Anthropic") {
             $apiKeys["ANTHROPIC_API_KEY"] = $anthropicKey
-            Write-Success "Anthropic API key validated"
+            Write-Success "Anthropic API key auto-discovered from GCP ✨"
             $hasProvider = $true
         } else {
-            Write-Warning "Anthropic key format looks incorrect (expected: sk-ant-...)"
-            $continue = Read-Host "Continue anyway? (y/N)"
-            if ($continue -eq "y" -or $continue -eq "Y") {
+            Write-Warning "GCP secret found but format invalid - will prompt manually"
+            $anthropicKey = $null
+        }
+    }
+    
+    # Fallback to manual input
+    if (-not $anthropicKey) {
+        Write-Host "Format: sk-ant-... (starts with sk-ant-)" -ForegroundColor Gray
+        $anthropicKey = Read-Host "ANTHROPIC_API_KEY (press Enter to skip)"
+        
+        if (-not [string]::IsNullOrWhiteSpace($anthropicKey)) {
+            if (Test-ApiKey -Key $anthropicKey -Provider "Anthropic") {
                 $apiKeys["ANTHROPIC_API_KEY"] = $anthropicKey
+                Write-Success "Anthropic API key validated"
                 $hasProvider = $true
+            } else {
+                Write-Warning "Anthropic key format looks incorrect (expected: sk-ant-...)"
+                $continue = Read-Host "Continue anyway? (y/N)"
+                if ($continue -eq "y" -or $continue -eq "Y") {
+                    $apiKeys["ANTHROPIC_API_KEY"] = $anthropicKey
+                    $hasProvider = $true
+                }
             }
         }
     }
@@ -224,9 +324,11 @@ function Get-ApiKeys {
     
     if (-not $hasProvider) {
         Write-Error "At least one LLM provider API key is required"
-        Write-Info "Get API keys from:"
-        Write-Host "  - OpenAI: https://platform.openai.com/api-keys" -ForegroundColor White
-        Write-Host "  - Anthropic: https://console.anthropic.com/settings/keys" -ForegroundColor White
+        Write-Info "Options:"
+        Write-Host "  1. Store in GCP Secret Manager: OPENAI_API_KEY or openai-api-key" -ForegroundColor White
+        Write-Host "  2. Get API keys from:" -ForegroundColor White
+        Write-Host "     - OpenAI: https://platform.openai.com/api-keys" -ForegroundColor White
+        Write-Host "     - Anthropic: https://console.anthropic.com/settings/keys" -ForegroundColor White
         exit 1
     }
     
