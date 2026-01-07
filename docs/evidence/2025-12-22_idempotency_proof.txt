@@ -1,0 +1,135 @@
+# Evidence: Step 2/3 - Idempotency via comment.id Markers
+
+**Date:** 2025-12-22  
+**Gate:** Protocol Hardening (Foundation 2/3)  
+**Status:** COMPLETE
+
+---
+
+## 1) PR/Commit Proof ✅
+
+- **PR:** https://github.com/edri2or-commits/project-38/pull/35
+- **SHA:** `ca20c3f624e693b148245676676b8c54bd336090`
+- **Status:** merged (squash)
+- **Branch:** feat/idempotency-comment-markers
+- **Files:** `.github/workflows/llm-bot-stage2b.yml` (36 insertions, 12 deletions)
+
+---
+
+## 2) E2E Execution Proof (Pending Test)
+
+**Test Plan:**
+1. Post `/ask test idempotency` to Issue #24
+2. Verify: LLM replies with marker `<!-- P38_IDEMPOTENCY_KEY: comment_{id} -->`
+3. Manually re-run workflow (Actions UI → Re-run jobs)
+4. Verify: Idempotency Check logs "Already replied to comment #{id}"
+5. Verify: No duplicate reply posted
+
+**Expected Behavior:**
+- **First run:** No marker found → LLM executes → Reply with marker
+- **Re-run:** Marker found → Skip → No duplicate
+
+**Evidence Collection:**
+- Actions run URL (first execution)
+- Actions run URL (re-run, skipped)
+- Issue #24 comment showing single reply with marker
+
+---
+
+## 3) Code Diff Proof ✅
+
+### Key Implementation
+
+**New Guard (Step 2 in chain):**
+```yaml
+- name: Idempotency Check - Skip if already replied to this comment
+  id: idempotency_check
+  if: steps.bot_check.outputs.skip == 'false'
+  env:
+    GH_TOKEN: ${{ github.token }}
+  run: |
+    COMMENT_ID="${{ github.event.comment.id }}"
+    MARKER="P38_IDEMPOTENCY_KEY: comment_${COMMENT_ID}"
+    
+    # Search Issue #24 comments for existing marker
+    FOUND=$(gh api repos/${{ github.repository }}/issues/24/comments \
+      --jq ".[] | select(.body | contains(\"$MARKER\")) | .id" | head -n 1)
+    
+    if [ -n "$FOUND" ]; then
+      echo "skip=true" >> $GITHUB_OUTPUT
+      echo "::notice::Skipping: Already replied to comment #${COMMENT_ID} (found in comment #${FOUND})"
+    else
+      echo "skip=false" >> $GITHUB_OUTPUT
+      echo "::notice::Idempotency OK - no previous reply to comment #${COMMENT_ID}"
+    fi
+```
+
+**Marker Added to Reply:**
+```python
+output = f"""🤖 **LLM Response** (Claude Sonnet 4)
+
+{response_text}
+
+---
+*Command: `{command_line.split()[0]}`*
+*Model: claude-sonnet-4-20250514*
+<!-- P38_LLM_RESPONSE -->
+<!-- P38_IDEMPOTENCY_KEY: comment_{comment_id} -->"""
+```
+
+**Guard Chain (Updated):**
+1. Bot Guard → Skip Bot users
+2. **Idempotency Check** → Skip if already replied (NEW)
+3. Access Control → OWNER/MEMBER only
+4. Command Guard → /ask or /plan only
+
+---
+
+## Technical Facts
+
+**Mechanism:**
+- Every comment has unique `github.event.comment.id`
+- Bot replies include HTML marker: `<!-- P38_IDEMPOTENCY_KEY: comment_{id} -->`
+- Before execution: Search Issue #24 comments for marker
+- If found: Skip (already replied)
+- If not found: Execute + add marker to new reply
+
+**Re-run Safety:**
+- GitHub Actions "Re-run jobs" triggers same `issue_comment.created` event
+- Same `comment.id` → Same marker → Idempotency Check skips
+- No duplicate API calls, no duplicate replies
+
+**Scope:**
+- Limited to Issue #24 (Control Room)
+- Works for any command: `/ask`, `/plan`, future commands
+- Marker hidden (HTML comment, not visible in UI)
+
+---
+
+## Testing Status
+
+**Status:** PENDING (requires manual test)
+
+**Test Steps:**
+1. ✅ PR merged to main
+2. ⏳ Post `/ask` command to Issue #24
+3. ⏳ Verify marker in reply
+4. ⏳ Re-run workflow
+5. ⏳ Verify no duplicate reply
+
+**Next Action:**
+- Post test command to Issue #24
+- OR: Defer test until Step 3/3 complete (test all 3 steps together)
+
+---
+
+## Refs
+
+- **Control Room:** Issue #24
+- **ADR-001:** PR #34 (Actions vs Cloud Run)
+- **Rule 16:** Evidence-First Protocol (PR #33)
+- **Development Freeze:** ON until Gate "Protocol Hardening" CLOSED
+
+---
+
+**DoD Status:** 2/3 steps complete (Pending E2E test)

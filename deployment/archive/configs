@@ -1,0 +1,41 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: github-webhook-receiver
+spec:
+  template:
+    metadata:
+      annotations:
+        autoscaling.knative.dev/maxScale: '10'
+    spec:
+      containerConcurrency: 80
+      timeoutSeconds: 300
+      serviceAccountName: github-webhook-receiver-sa@project-38-ai.iam.gserviceaccount.com
+      containers:
+      - image: gcr.io/project-38-ai/airlock@sha256:980eda33cd2200243b9899da1a20c2c07d2d621fe0b48386342a9822dfc785a0
+        ports:
+        - containerPort: 8080
+          name: http1
+        env:
+        - name: GCP_PROJECT_ID
+          value: project-38-ai
+        - name: GITHUB_APP_ID
+          value: '2497877'
+        - name: GITHUB_INSTALLATION_ID
+          value: '61643297'
+        - name: WORKER_URL
+          value: https://worker-673161610630.us-central1.run.app
+        - name: GITHUB_APP_PRIVATE_KEY_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: github-app-private-key
+              key: latest
+        - name: WEBHOOK_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: github-webhook-secret
+              key: latest
+        resources:
+          limits:
+            cpu: '1'
+            memory: 512Mi

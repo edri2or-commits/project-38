@@ -1,0 +1,148 @@
+{
+  "$schema": "https://railway.app/railway.schema.json",
+  "build": {
+    "builder": "NIXPACKS"
+  },
+  "deploy": {
+    "numReplicas": 1,
+    "sleepApplication": false,
+    "restartPolicyType": "ON_FAILURE",
+    "restartPolicyMaxRetries": 10
+  },
+  "services": {
+    "postgres": {
+      "image": "postgres:15-alpine",
+      "environment": {
+        "POSTGRES_USER": "${{POSTGRES_USER}}",
+        "POSTGRES_PASSWORD": "${{POSTGRES_PASSWORD}}",
+        "POSTGRES_DB": "${{POSTGRES_DB}}",
+        "PGDATA": "/var/lib/postgresql/data/pgdata"
+      },
+      "volumes": [
+        {
+          "mountPath": "/var/lib/postgresql/data",
+          "name": "postgres-data"
+        }
+      ],
+      "healthcheck": {
+        "test": ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"],
+        "interval": 10,
+        "timeout": 5,
+        "retries": 5,
+        "startPeriod": 30
+      }
+    },
+    "redis": {
+      "image": "redis:7-alpine",
+      "command": "redis-server --requirepass ${{REDIS_PASSWORD}} --maxmemory 256mb --maxmemory-policy allkeys-lru",
+      "environment": {
+        "REDIS_PASSWORD": "${{REDIS_PASSWORD}}"
+      },
+      "healthcheck": {
+        "test": ["CMD", "redis-cli", "--raw", "incr", "ping"],
+        "interval": 10,
+        "timeout": 5,
+        "retries": 5,
+        "startPeriod": 10
+      }
+    },
+    "dify-api": {
+      "image": "langgenius/dify-api:latest",
+      "environment": {
+        "MODE": "api",
+        "LOG_LEVEL": "INFO",
+        "SECRET_KEY": "${{SECRET_KEY}}",
+        "DB_USERNAME": "${{POSTGRES_USER}}",
+        "DB_PASSWORD": "${{POSTGRES_PASSWORD}}",
+        "DB_HOST": "${{RAILWAY_PRIVATE_DOMAIN_POSTGRES}}",
+        "DB_PORT": "5432",
+        "DB_DATABASE": "${{POSTGRES_DB}}",
+        "REDIS_HOST": "${{RAILWAY_PRIVATE_DOMAIN_REDIS}}",
+        "REDIS_PORT": "6379",
+        "REDIS_PASSWORD": "${{REDIS_PASSWORD}}",
+        "REDIS_USE_SSL": "false",
+        "REDIS_DB": "0",
+        "CELERY_BROKER_URL": "redis://:${{REDIS_PASSWORD}}@${{RAILWAY_PRIVATE_DOMAIN_REDIS}}:6379/1",
+        "WEB_API_CORS_ALLOW_ORIGINS": "*",
+        "CONSOLE_CORS_ALLOW_ORIGINS": "*",
+        "STORAGE_TYPE": "local",
+        "STORAGE_LOCAL_PATH": "/app/storage",
+        "VECTOR_STORE": "pgvector",
+        "PGVECTOR_HOST": "${{RAILWAY_PRIVATE_DOMAIN_POSTGRES}}",
+        "PGVECTOR_PORT": "5432",
+        "PGVECTOR_USER": "${{POSTGRES_USER}}",
+        "PGVECTOR_PASSWORD": "${{POSTGRES_PASSWORD}}",
+        "PGVECTOR_DATABASE": "${{POSTGRES_DB}}",
+        "OPENAI_API_KEY": "${{OPENAI_API_KEY}}",
+        "ANTHROPIC_API_KEY": "${{ANTHROPIC_API_KEY}}"
+      },
+      "volumes": [
+        {
+          "mountPath": "/app/storage",
+          "name": "dify-storage"
+        }
+      ],
+      "dependsOn": ["postgres", "redis"],
+      "healthcheck": {
+        "test": ["CMD", "curl", "-f", "http://localhost:5001/health"],
+        "interval": 30,
+        "timeout": 10,
+        "retries": 3,
+        "startPeriod": 60
+      }
+    },
+    "dify-worker": {
+      "image": "langgenius/dify-api:latest",
+      "environment": {
+        "MODE": "worker",
+        "LOG_LEVEL": "INFO",
+        "SECRET_KEY": "${{SECRET_KEY}}",
+        "DB_USERNAME": "${{POSTGRES_USER}}",
+        "DB_PASSWORD": "${{POSTGRES_PASSWORD}}",
+        "DB_HOST": "${{RAILWAY_PRIVATE_DOMAIN_POSTGRES}}",
+        "DB_PORT": "5432",
+        "DB_DATABASE": "${{POSTGRES_DB}}",
+        "REDIS_HOST": "${{RAILWAY_PRIVATE_DOMAIN_REDIS}}",
+        "REDIS_PORT": "6379",
+        "REDIS_PASSWORD": "${{REDIS_PASSWORD}}",
+        "REDIS_USE_SSL": "false",
+        "REDIS_DB": "0",
+        "CELERY_BROKER_URL": "redis://:${{REDIS_PASSWORD}}@${{RAILWAY_PRIVATE_DOMAIN_REDIS}}:6379/1",
+        "STORAGE_TYPE": "local",
+        "STORAGE_LOCAL_PATH": "/app/storage",
+        "VECTOR_STORE": "pgvector",
+        "PGVECTOR_HOST": "${{RAILWAY_PRIVATE_DOMAIN_POSTGRES}}",
+        "PGVECTOR_PORT": "5432",
+        "PGVECTOR_USER": "${{POSTGRES_USER}}",
+        "PGVECTOR_PASSWORD": "${{POSTGRES_PASSWORD}}",
+        "PGVECTOR_DATABASE": "${{POSTGRES_DB}}",
+        "OPENAI_API_KEY": "${{OPENAI_API_KEY}}",
+        "ANTHROPIC_API_KEY": "${{ANTHROPIC_API_KEY}}"
+      },
+      "volumes": [
+        {
+          "mountPath": "/app/storage",
+          "name": "dify-storage"
+        }
+      ],
+      "dependsOn": ["postgres", "redis", "dify-api"]
+    },
+    "dify-web": {
+      "image": "langgenius/dify-web:latest",
+      "environment": {
+        "CONSOLE_API_URL": "https://${{RAILWAY_PUBLIC_DOMAIN_DIFY_API}}",
+        "APP_API_URL": "https://${{RAILWAY_PUBLIC_DOMAIN_DIFY_API}}",
+        "NEXT_PUBLIC_API_PREFIX": "/api",
+        "NEXT_PUBLIC_PUBLIC_API_PREFIX": "/api"
+      },
+      "dependsOn": ["dify-api"],
+      "healthcheck": {
+        "test": ["CMD", "curl", "-f", "http://localhost:3000"],
+        "interval": 30,
+        "timeout": 10,
+        "retries": 3,
+        "startPeriod": 30
+      }
+    }
+  }
+}
